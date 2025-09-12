@@ -1,0 +1,32 @@
+{
+    "appId": "com.lh_unc_pardina_lucas.scmatu_software",  
+    "files": [
+        "dist-electron",
+        "dist-react"
+    ],
+    "icon": "./desktopIcon.png", 
+    "mac": {
+        "target": "dmg"
+    },
+    "linux": {
+        "target": [
+            "AppImage",
+            "deb"
+        ],
+        "category": "Utility"
+    },
+    "win": {
+        "target": [
+            "portable",
+            "nsis"
+        ]
+    },
+    "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true,
+        "createDesktopShortcut": true,
+        "shortcutName": "SCMATU-Software",
+        "allowElevation": true,
+        "runAfterFinish": true
+    }
+}
