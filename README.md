@@ -32,3 +32,6 @@ To work with this repository ni your local machine, use the following commands:
     git pull develop
     ```
 
+## 📄 Documentation
+
+- [Software Requirements Specification](docs/requirements.md)
