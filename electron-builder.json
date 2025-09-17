@@ -1,5 +1,5 @@
 {
-    "appId": "com.lh_unc_pardina_lucas.scmatu_software",  
+    "appId": "com.lh_unc_pardina_lucas.scmatu_software", 
     "files": [
         "dist-electron",
         "dist-react"

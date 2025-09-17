@@ -16,6 +16,6 @@
     "include": [
             "main.ts",
             "util.ts",
-            "preload.ts"
+            "preload.cts"
     ]
 }

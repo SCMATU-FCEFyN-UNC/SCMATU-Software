@@ -1,9 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "Node",  // ✅ Must match module type
+    "module": "NodeNext",
+    //"moduleResolution": "Node",  // ✅ Must match module type
     "outDir": "../../dist-electron"
   },
-  "include": ["preload.ts"]
+  "include": ["preload.cts"]
 }

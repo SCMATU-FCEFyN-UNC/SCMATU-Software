@@ -2,21 +2,22 @@
 import {app, BrowserWindow} from 'electron';
 import path from 'path';
 import { isDev } from './util.js';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+//import { dirname } from 'path';
+//import { fileURLToPath } from 'url';
+import { getPreloadPath } from './pathResolver.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+//const __dirname = dirname(fileURLToPath(import.meta.url));
 
 app.on('ready', () => {
     
-    const preloadPath = path.resolve(__dirname, 'preload.js');
+    //const preloadPath = path.resolve(__dirname, 'preload.js');
 
     const mainWindow = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
         contextIsolation: true,
-        preload: preloadPath, // Use the correct path to preload.js
+        preload: getPreloadPath(), // Run preload before loading the renderer, using the cross-platform obtained preload path
         },
     });
 

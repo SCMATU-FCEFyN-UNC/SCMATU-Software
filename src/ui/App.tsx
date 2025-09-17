@@ -1,11 +1,13 @@
-import { useState } from "react";
+//import { useState } from "react";
 import "./app.scss";
 
 function App() {
+  const welcomeMsg = window.electron.getWelcomeMessage();
+
   return (
     <>
       <div>
-        <h1>UI Goes Here</h1>
+        <h1>{welcomeMsg}</h1>
       </div>
     </>
   );
