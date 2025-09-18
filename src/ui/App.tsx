@@ -1,4 +1,6 @@
 //import { useState } from "react";
+import Hello from "./components/Hello/Hello";
+import { BackendUrlProvider } from "./context/BackendUrlProvider";
 import "./app.scss";
 
 function App() {
@@ -6,9 +8,12 @@ function App() {
 
   return (
     <>
-      <div>
-        <h1>{welcomeMsg}</h1>
-      </div>
+      <BackendUrlProvider>
+        <div>
+          <h1>{welcomeMsg}</h1>
+        </div>
+        <Hello />
+      </BackendUrlProvider>
     </>
   );
 }

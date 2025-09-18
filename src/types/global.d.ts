@@ -13,5 +13,8 @@ declare global {
     electron: {
       getWelcomeMessage: () => string;
     };
+    electronAPI: {
+      getBackendPort: () => Promise<number>;
+    };
   }
 }

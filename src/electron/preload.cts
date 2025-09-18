@@ -23,3 +23,7 @@ contextBridge.exposeInMainWorld("ipcRenderer", {
 contextBridge.exposeInMainWorld("electron", {
     getWelcomeMessage: () => "Welcome to Electron! (this message was shared via IPC)",
 });
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  getBackendPort: () => ipcRenderer.invoke('get-backend-port')
+});
