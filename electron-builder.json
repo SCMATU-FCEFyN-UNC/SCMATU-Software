@@ -4,6 +4,13 @@
         "dist-electron",
         "dist-react"
     ],
+    "extraResources": [
+        {
+            "from": "src/electron/backend",
+            "to": "backend",
+            "filter": ["**/*"]
+        }
+    ],
     "icon": "./desktopIcon.png", 
     "mac": {
         "target": "dmg"
