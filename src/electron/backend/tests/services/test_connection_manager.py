@@ -34,30 +34,28 @@ class TestConnectionManager:
 
     @pytest.mark.asyncio
     async def test_connect_success(self):
-        """Test successful connection"""
+        """Test successful connection with parameters"""
         mock_client = AsyncMock()
+        mock_client.connect = AsyncMock()
         mock_client.connected = True
-        
-        with patch('backend.services.connection_manager.AsyncModbusSerialClient', return_value=mock_client), \
-             patch('backend.services.connection_manager.pymodbus_apply_logging_config'):
-            
-            result = await connection_manager.connect("COM3", 9600)
-            
+
+        with patch("backend.services.connection_manager.AsyncModbusSerialClient", return_value=mock_client):
+            result = await connection_manager.connect(
+                port="COM5", baudrate=19200, parity="E", stopbits=2, bytesize=7, timeout=2
+            )
             assert result is True
             assert connection_manager.client == mock_client
-            assert connection_manager.connected_port == "COM3"
+            assert connection_manager.connected_port == "COM5"
 
     @pytest.mark.asyncio
     async def test_connect_failure(self):
         """Test failed connection"""
         mock_client = AsyncMock()
+        mock_client.connect = AsyncMock()
         mock_client.connected = False
-        
-        with patch('backend.services.connection_manager.AsyncModbusSerialClient', return_value=mock_client), \
-             patch('backend.services.connection_manager.pymodbus_apply_logging_config'):
-            
-            result = await connection_manager.connect("COM3", 9600)
-            
+
+        with patch("backend.services.connection_manager.AsyncModbusSerialClient", return_value=mock_client):
+            result = await connection_manager.connect(port="COMX")
             assert result is False
             assert connection_manager.client is None
             assert connection_manager.connected_port is None
@@ -66,30 +64,26 @@ class TestConnectionManager:
     async def test_disconnect_with_connection(self):
         """Test disconnect when connected"""
         mock_client = AsyncMock()
-        # Make close an async method
         mock_client.close = AsyncMock()
         mock_client.connected = True
-        
-        # Set up global state in the actual module
+
         connection_manager.client = mock_client
         connection_manager.connected_port = "COM3"
-        
+
         await connection_manager.disconnect()
-        
-        mock_client.close.assert_called_once()
+
+        mock_client.close.assert_awaited_once()
         assert connection_manager.client is None
         assert connection_manager.connected_port is None
 
     @pytest.mark.asyncio
     async def test_disconnect_without_connection(self):
         """Test disconnect when not connected"""
-        # Ensure no connection exists
         connection_manager.client = None
         connection_manager.connected_port = None
-        
-        # This should not raise any errors
+
         await connection_manager.disconnect()
-        
+
         assert connection_manager.client is None
         assert connection_manager.connected_port is None
 
@@ -97,44 +91,35 @@ class TestConnectionManager:
         """Test getting client when connected"""
         mock_client = Mock()
         mock_client.connected = True
-        
+
         connection_manager.client = mock_client
-        
+
         result = connection_manager.get_client()
         assert result == mock_client
 
     def test_get_client_failure(self):
         """Test getting client when not connected"""
         connection_manager.client = None
-        
+
         with pytest.raises(RuntimeError, match="No active Modbus connection"):
             connection_manager.get_client()
 
     def test_get_status_connected(self):
         """Test status when connected"""
-        mock_client = Mock()
-        mock_client.connected = True
-        
-        connection_manager.client = mock_client
+        connection_manager.client = AsyncMock()
+        connection_manager.client.connected = True
         connection_manager.connected_port = "COM3"
-        
-        result = connection_manager.get_status()
-        
-        expected = {
-            "connected": True,
-            "port": "COM3"
-        }
-        assert result == expected
+
+        status = connection_manager.get_status()
+        assert status["connected"] is True
+        assert status["port"] == "COM3"
 
     def test_get_status_disconnected(self):
         """Test status when disconnected"""
         connection_manager.client = None
         connection_manager.connected_port = None
-        
+
         result = connection_manager.get_status()
-        
-        expected = {
-            "connected": False,
-            "port": None
-        }
+
+        expected = {"connected": False, "port": None}
         assert result == expected

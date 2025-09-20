@@ -11,11 +11,28 @@ def get_ports():
 
 @serial_bp.route("/connect", methods=["POST"])
 def connect_port():
-    data = request.get_json()
-    if not data or "port" not in data:
+    """
+    Connect to a serial port using parameters from request JSON.
+    Expected JSON keys:
+      - port (required)
+      - baudrate, bytesize, parity, stopbits, timeout (optional)
+    """
+    data = request.get_json() or {}
+    if "port" not in data:
         return jsonify({"error": "Missing 'port'"}), 400
 
-    success = asyncio.run(connection_manager.connect(data["port"]))
+    # Build parameters dictionary with defaults
+    params = {
+        "port": data["port"],
+        "baudrate": data.get("baudrate", 9600),
+        "bytesize": data.get("bytesize", 8),
+        "parity": data.get("parity", "N"),
+        "stopbits": data.get("stopbits", 1),
+        "timeout": data.get("timeout", 1),  # default 1s timeout
+    }
+
+    success = asyncio.run(connection_manager.connect(**params))
+
     return jsonify({"success": success}), 200 if success else 500
 
 @serial_bp.route("/disconnect", methods=["POST"])
