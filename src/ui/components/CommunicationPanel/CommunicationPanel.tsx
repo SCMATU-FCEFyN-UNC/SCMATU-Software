@@ -43,6 +43,22 @@ const CommunicationPanel: React.FC = () => {
   async function handleConnect() {
     try {
       setLoading(true);
+
+      // Step 1: Re-fetch ports to ensure selected port is still available
+      const portResponse = await makeRequest("/ports", { method: "GET" });
+      const availablePorts: PortInfo[] = portResponse.data.ports;
+      const stillAvailable = availablePorts.some(
+        (p) => p.device === selectedPort
+      );
+
+      if (!stillAvailable) {
+        alert(`Selected port ${selectedPort} is no longer available.`);
+        setPorts(availablePorts);
+        setSelectedPort(""); // reset selection
+        return;
+      }
+
+      // Step 2: Proceed with connection
       const response = await makeRequest("/connect", {
         method: "POST",
         data: {
@@ -53,6 +69,7 @@ const CommunicationPanel: React.FC = () => {
           bytesize,
         },
       });
+
       if (response.data.success) {
         setConnected(true);
       }
@@ -91,7 +108,7 @@ const CommunicationPanel: React.FC = () => {
         <label htmlFor="port-select">Port:</label>
         <select
           id="port-select"
-          disabled={ports.length === 0}
+          disabled={ports.length === 0 || connected}
           value={selectedPort}
           onChange={(e) => setSelectedPort(e.target.value)}
         >
@@ -110,12 +127,17 @@ const CommunicationPanel: React.FC = () => {
           <input
             type="number"
             value={baudrate}
+            disabled={connected}
             onChange={(e) => setBaudrate(Number(e.target.value))}
           />
         </label>
         <label>
           Parity:
-          <select value={parity} onChange={(e) => setParity(e.target.value)}>
+          <select
+            value={parity}
+            disabled={connected}
+            onChange={(e) => setParity(e.target.value)}
+          >
             <option value="N">None</option>
             <option value="E">Even</option>
             <option value="O">Odd</option>
@@ -126,6 +148,7 @@ const CommunicationPanel: React.FC = () => {
           <input
             type="number"
             value={stopbits}
+            disabled={connected}
             min={1}
             max={2}
             onChange={(e) => setStopbits(Number(e.target.value))}
@@ -136,6 +159,7 @@ const CommunicationPanel: React.FC = () => {
           <input
             type="number"
             value={bytesize}
+            disabled={connected}
             min={5}
             max={8}
             onChange={(e) => setBytesize(Number(e.target.value))}
