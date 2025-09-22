@@ -9,6 +9,11 @@
             "from": "src/electron/backend",
             "to": "backend",
             "filter": ["**/*"]
+        },
+        {
+            "from": "dist-electron",
+            "to": "dist-electron",
+            "filter": ["preload.cjs"]
         }
     ],
     "icon": "./desktopIcon.png", 
