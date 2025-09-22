@@ -1,5 +1,5 @@
 // ui/components/CommunicationPanel/CommunicationPanel.tsx
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useBackendRequest } from "../../utils/backendRequests";
 import "./CommunicationPanel.model.scss";
 
@@ -17,48 +17,54 @@ const CommunicationPanel: React.FC = () => {
   const [bytesize, setBytesize] = useState(8);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { makeRequest } = useBackendRequest();
 
+  // Track last fetch request to avoid race condition overwriting
+  const lastRequestId = useRef(0);
+
   async function handleFetchPorts() {
+    const requestId = ++lastRequestId.current;
     try {
       setLoading(true);
-      const response = await makeRequest("/ports", {
-        method: "GET",
-      });
-      console.log("Fetched ports:", response.data.ports);
-      setPorts(response.data.ports);
-      /*if (response.data.ports === "success") {
-        setPorts(response.data.ports);
-      } else {
-        console.error("Error fetching COM ports:", response.data.message);
-      }*/
+      setErrorMessage(null);
+
+      const response = await makeRequest("/ports", { method: "GET" });
+
+      if (requestId !== lastRequestId.current) return; // ignore stale result
+      const newPorts: PortInfo[] = response?.data?.ports ?? []; // ✅ always an array
+      setPorts(newPorts);
+
+      // If currently selected port no longer exists, clear it
+      if (!newPorts.find((p) => p.device === selectedPort)) {
+        setSelectedPort("");
+      }
     } catch (err) {
       console.error("Failed to fetch ports:", err);
+      if (requestId === lastRequestId.current)
+        setErrorMessage("Failed to fetch available ports. Please try again.");
     } finally {
-      setLoading(false);
+      if (requestId === lastRequestId.current) setLoading(false);
     }
   }
 
   async function handleConnect() {
     try {
       setLoading(true);
+      setErrorMessage(null);
 
-      // Step 1: Re-fetch ports to ensure selected port is still available
+      // Re-fetch ports to validate availability
       const portResponse = await makeRequest("/ports", { method: "GET" });
-      const availablePorts: PortInfo[] = portResponse.data.ports;
-      const stillAvailable = availablePorts.some(
-        (p) => p.device === selectedPort
-      );
+      const availablePorts: PortInfo[] = portResponse?.data?.ports ?? [];
+      setPorts(availablePorts);
 
-      if (!stillAvailable) {
-        alert(`Selected port ${selectedPort} is no longer available.`);
-        setPorts(availablePorts);
-        setSelectedPort(""); // reset selection
+      if (!availablePorts.some((p) => p.device === selectedPort)) {
+        setSelectedPort("");
+        setErrorMessage("Selected port is no longer available.");
         return;
       }
 
-      // Step 2: Proceed with connection
       const response = await makeRequest("/connect", {
         method: "POST",
         data: {
@@ -72,9 +78,14 @@ const CommunicationPanel: React.FC = () => {
 
       if (response.data.success) {
         setConnected(true);
+      } else {
+        setErrorMessage("Failed to connect to the selected port.");
       }
     } catch (err) {
       console.error("Failed to connect:", err);
+      setErrorMessage(
+        "Failed to connect. Please check the device and try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -83,18 +94,30 @@ const CommunicationPanel: React.FC = () => {
   async function handleDisconnect() {
     try {
       setLoading(true);
-      const response = await makeRequest("/disconnect", {
-        method: "POST",
-      });
+      setErrorMessage(null);
+
+      const response = await makeRequest("/disconnect", { method: "POST" });
       if (response.data.success) {
         setConnected(false);
+      } else {
+        setErrorMessage("Failed to disconnect properly.");
       }
     } catch (err) {
       console.error("Failed to disconnect:", err);
+      setErrorMessage("Unexpected error while disconnecting.");
     } finally {
       setLoading(false);
     }
   }
+
+  // Auto-disconnect if selected port disappears while connected
+  useEffect(() => {
+    if (connected && !ports.find((p) => p.device === selectedPort)) {
+      setConnected(false);
+      setSelectedPort("");
+      setErrorMessage("Connection lost: port is no longer available.");
+    }
+  }, [ports, connected, selectedPort]);
 
   return (
     <div className="communication-panel">
@@ -108,7 +131,7 @@ const CommunicationPanel: React.FC = () => {
         <label htmlFor="port-select">Port:</label>
         <select
           id="port-select"
-          disabled={ports.length === 0 || connected}
+          disabled={(ports?.length ?? 0) === 0 || connected || loading} // ✅ safe check
           value={selectedPort}
           onChange={(e) => setSelectedPort(e.target.value)}
         >
@@ -127,7 +150,7 @@ const CommunicationPanel: React.FC = () => {
           <input
             type="number"
             value={baudrate}
-            disabled={connected}
+            disabled={connected || loading}
             onChange={(e) => setBaudrate(Number(e.target.value))}
           />
         </label>
@@ -135,7 +158,7 @@ const CommunicationPanel: React.FC = () => {
           Parity:
           <select
             value={parity}
-            disabled={connected}
+            disabled={connected || loading}
             onChange={(e) => setParity(e.target.value)}
           >
             <option value="N">None</option>
@@ -148,9 +171,9 @@ const CommunicationPanel: React.FC = () => {
           <input
             type="number"
             value={stopbits}
-            disabled={connected}
             min={1}
             max={2}
+            disabled={connected || loading}
             onChange={(e) => setStopbits(Number(e.target.value))}
           />
         </label>
@@ -159,9 +182,9 @@ const CommunicationPanel: React.FC = () => {
           <input
             type="number"
             value={bytesize}
-            disabled={connected}
             min={5}
             max={8}
+            disabled={connected || loading}
             onChange={(e) => setBytesize(Number(e.target.value))}
           />
         </label>
@@ -170,19 +193,22 @@ const CommunicationPanel: React.FC = () => {
       <div className="form-row">
         {!connected ? (
           <button onClick={handleConnect} disabled={!selectedPort || loading}>
-            Connect
+            {loading ? "Connecting..." : "Connect"}
           </button>
         ) : (
           <button onClick={handleDisconnect} disabled={loading}>
-            Disconnect
+            {loading ? "Disconnecting..." : "Disconnect"}
           </button>
         )}
       </div>
 
+      {errorMessage && <p className="status error">⚠️ {errorMessage}</p>}
       {connected && (
         <p className="status connected">✅ Connected to {selectedPort}</p>
       )}
-      {!connected && <p className="status disconnected">🔌 Not connected</p>}
+      {!connected && !errorMessage && (
+        <p className="status disconnected">🔌 Not connected</p>
+      )}
     </div>
   );
 };
