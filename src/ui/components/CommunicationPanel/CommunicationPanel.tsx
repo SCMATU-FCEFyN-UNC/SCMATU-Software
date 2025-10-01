@@ -1,6 +1,7 @@
 // ui/components/CommunicationPanel/CommunicationPanel.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { useBackendRequest } from "../../utils/backendRequests";
+import { useConnection } from "../../context/ConnectionStatusProvider";
 import "./CommunicationPanel.model.scss";
 
 interface PortInfo {
@@ -10,16 +11,16 @@ interface PortInfo {
 
 const CommunicationPanel: React.FC = () => {
   const [ports, setPorts] = useState<PortInfo[]>([]);
-  const [selectedPort, setSelectedPort] = useState("");
   const [baudrate, setBaudrate] = useState(9600);
   const [parity, setParity] = useState("N");
   const [stopbits, setStopbits] = useState(1);
   const [bytesize, setBytesize] = useState(8);
-  const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { makeRequest } = useBackendRequest();
+  const { connected, setConnected, selectedPort, setSelectedPort } =
+    useConnection();
 
   // Track last fetch request to avoid race condition overwriting
   const lastRequestId = useRef(0);
