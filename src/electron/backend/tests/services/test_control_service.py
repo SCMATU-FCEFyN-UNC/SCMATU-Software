@@ -8,12 +8,13 @@ class TestControlService:
             result = control_service.set_frequency(60000)
             assert result["success"]
             assert result["frequency"] == 60000
-            assert mock_write.call_count == 2  # hi + lo parts
+            assert mock_write.call_count == 3  # hi + lo + coil write
             
             # Verify the correct values were written
             calls = mock_write.call_args_list
             assert calls[0][0] == ("holding", 20, 2, 0)  # hi part for 60000
             assert calls[1][0] == ("holding", 20, 3, 60000)  # lo part for 60000
+            assert calls[2][0] == ("coil", 20, 4, 1)  # trigger write
 
     def test_set_frequency_invalid_negative(self):
         with pytest.raises(ValueError, match="Frequency must be a positive integer"):

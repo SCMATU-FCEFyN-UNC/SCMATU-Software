@@ -13,6 +13,7 @@ def set_frequency(frequency_hz: int):
 
     manager.write("holding", 20, 2, freq_hi)
     manager.write("holding", 20, 3, freq_lo)
+    manager.write("coil", 20, 4, 1)
 
     return {"success": True, "frequency": frequency_hz}
 
