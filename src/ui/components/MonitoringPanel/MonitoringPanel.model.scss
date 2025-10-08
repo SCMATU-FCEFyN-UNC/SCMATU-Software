@@ -1,0 +1,88 @@
+.panel {
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  padding: 1rem;
+  background: #f9f9f9;
+  margin-top: 1rem;
+  max-width: 500px;
+
+  h2 {
+    margin-bottom: 1rem;
+    font-size: 1.4rem;
+    color: #333;
+  }
+}
+
+.fieldGroup {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+
+  label {
+    font-weight: bold;
+    margin-bottom: 0.3rem;
+  }
+
+  input {
+    padding: 0.4rem;
+    font-size: 1rem;
+    border: 1px solid #bbb;
+    border-radius: 5px;
+    margin-bottom: 0.4rem;
+    background: #e9ecef;
+    color: #007bff;
+    font-weight: 500;
+  }
+
+  small {
+    color: #555;
+    font-size: 0.85rem;
+    margin-bottom: 0.3rem;
+  }
+
+  button {
+    align-self: flex-start;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.95rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    background: #007bff;
+    color: white;
+    transition: background 0.2s ease-in-out;
+
+    &:hover:not(:disabled) {
+      background: #0056b3;
+    }
+
+    &:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+
+  button {
+    padding: 0.6rem 1.2rem;
+    font-size: 1rem;
+    border-radius: 6px;
+  }
+}
+
+.warning {
+  text-align: center;
+  color: #cc8800;
+  font-weight: 500;
+}
+
+.message {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  color: #333;
+  text-align: center;
+}
