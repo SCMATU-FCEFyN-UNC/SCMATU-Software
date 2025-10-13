@@ -13,6 +13,38 @@ interface MonitoringData {
   resonance_status: string | null;
 }
 
+type UnitType = "phase" | "current" | "power" | "period";
+
+interface UnitConfig {
+  label: string;
+  convert: (value: number) => number;
+}
+
+const unitConversions: Record<UnitType, UnitConfig[]> = {
+  phase: [
+    { label: "ns", convert: (val) => val },
+    { label: "µs", convert: (val) => val / 1000 },
+    { label: "ms", convert: (val) => val / 1000000 },
+  ],
+  current: [
+    { label: "A", convert: (val) => val },
+    { label: "mA", convert: (val) => val * 1000 },
+    { label: "µA", convert: (val) => val * 1000000 },
+  ],
+  power: [
+    { label: "VA", convert: (val) => val },
+    { label: "kVA", convert: (val) => val / 1000 },
+    { label: "mVA", convert: (val) => val * 1000 },
+    { label: "µVA", convert: (val) => val * 1000000 },
+  ],
+  period: [
+    { label: "s", convert: (val) => val },
+    { label: "ms", convert: (val) => val * 1000 },
+    { label: "µs", convert: (val) => val * 1000000 },
+    { label: "ns", convert: (val) => val * 1000000000 },
+  ],
+};
+
 const MonitoringPanel: React.FC = () => {
   const [data, setData] = useState<MonitoringData>({
     phase: null,
@@ -27,8 +59,89 @@ const MonitoringPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Unit selection state
+  const [selectedUnits, setSelectedUnits] = useState<Record<UnitType, string>>({
+    phase: "ns",
+    current: "A",
+    power: "VA",
+    period: "s",
+  });
+
   const { makeRequest } = useBackendRequest();
   const { connected } = useConnection();
+
+  // Helper function to format phase values with proper precision and lead/lag indication
+  const formatPhaseValue = (value: number | null, unit: string): string => {
+    if (value === null) return "";
+
+    const absValue = Math.abs(value);
+    let convertedValue: number;
+
+    if (unit === "ns") {
+      convertedValue = absValue;
+    } else if (unit === "µs") {
+      convertedValue = absValue / 1000;
+    } else {
+      // ms
+      convertedValue = absValue / 1000000;
+    }
+
+    // Use maximum precision without rounding
+    if (unit === "ns") {
+      return convertedValue.toFixed(0);
+    } else if (unit === "µs") {
+      // Show up to 3 decimal places for microseconds
+      return convertedValue.toFixed(3);
+    } else {
+      // ms
+      // Show up to 6 decimal places for milliseconds
+      return convertedValue.toFixed(6);
+    }
+  };
+
+  // Helper function to get phase lead/lag information
+  const getPhaseRelationship = (phase: number | null): string => {
+    if (phase === null) return "";
+    if (phase === 0) return " (in phase)";
+    if (phase < 0) return " (current leads voltage)";
+    return " (voltage leads current)";
+  };
+
+  // Helper function to format other values based on selected unit
+  const formatValue = (value: number | null, type: UnitType): string => {
+    if (value === null) return "";
+
+    const currentUnit = selectedUnits[type];
+    const unitConfig = unitConversions[type].find(
+      (unit) => unit.label === currentUnit
+    );
+
+    if (!unitConfig) return value.toString();
+
+    const convertedValue = unitConfig.convert(value);
+
+    // Apply appropriate formatting based on the value magnitude
+    if (type === "current") {
+      return convertedValue.toFixed(4);
+    } else if (type === "power") {
+      return convertedValue.toFixed(3);
+    } else if (type === "period") {
+      // Use scientific notation for very small period values
+      return convertedValue < 0.001
+        ? convertedValue.toExponential(3)
+        : convertedValue.toFixed(6);
+    }
+
+    return convertedValue.toString();
+  };
+
+  // Handle unit change
+  const handleUnitChange = (type: UnitType, newUnit: string) => {
+    setSelectedUnits((prev) => ({
+      ...prev,
+      [type]: newUnit,
+    }));
+  };
 
   async function fetchAllMetrics() {
     try {
@@ -102,8 +215,30 @@ const MonitoringPanel: React.FC = () => {
       <h2>Monitoring Panel</h2>
 
       <div className="fieldGroup">
-        <label>Phase Difference (ns)</label>
-        <input type="text" value={data.phase ?? ""} readOnly />
+        <label>Phase Difference</label>
+        <div className="input-with-unit">
+          <input
+            type="text"
+            value={formatPhaseValue(data.phase, selectedUnits.phase)}
+            readOnly
+          />
+          <select
+            value={selectedUnits.phase}
+            onChange={(e) => handleUnitChange("phase", e.target.value)}
+            disabled={!connected || loading}
+          >
+            {unitConversions.phase.map((unit) => (
+              <option key={unit.label} value={unit.label}>
+                {unit.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {data.phase !== null && (
+          <small className="phase-relationship">
+            {getPhaseRelationship(data.phase)}
+          </small>
+        )}
         <button
           onClick={() => fetchMetric("phase")}
           disabled={!connected || loading}
@@ -128,12 +263,25 @@ const MonitoringPanel: React.FC = () => {
       </div>
 
       <div className="fieldGroup">
-        <label>Current (A)</label>
-        <input
-          type="text"
-          value={data.current !== null ? data.current.toFixed(4) : ""}
-          readOnly
-        />
+        <label>Current</label>
+        <div className="input-with-unit">
+          <input
+            type="text"
+            value={formatValue(data.current, "current")}
+            readOnly
+          />
+          <select
+            value={selectedUnits.current}
+            onChange={(e) => handleUnitChange("current", e.target.value)}
+            disabled={!connected || loading}
+          >
+            {unitConversions.current.map((unit) => (
+              <option key={unit.label} value={unit.label}>
+                {unit.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => fetchMetric("current")}
           disabled={!connected || loading}
@@ -143,12 +291,25 @@ const MonitoringPanel: React.FC = () => {
       </div>
 
       <div className="fieldGroup">
-        <label>Power (VA)</label>
-        <input
-          type="text"
-          value={data.power !== null ? data.power.toFixed(3) : ""}
-          readOnly
-        />
+        <label>Power</label>
+        <div className="input-with-unit">
+          <input
+            type="text"
+            value={formatValue(data.power, "power")}
+            readOnly
+          />
+          <select
+            value={selectedUnits.power}
+            onChange={(e) => handleUnitChange("power", e.target.value)}
+            disabled={!connected || loading}
+          >
+            {unitConversions.power.map((unit) => (
+              <option key={unit.label} value={unit.label}>
+                {unit.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => fetchMetric("power")}
           disabled={!connected || loading}
@@ -158,12 +319,25 @@ const MonitoringPanel: React.FC = () => {
       </div>
 
       <div className="fieldGroup">
-        <label>Signal Period (s)</label>
-        <input
-          type="text"
-          value={data.period !== null ? data.period.toExponential(3) : ""}
-          readOnly
-        />
+        <label>Signal Period</label>
+        <div className="input-with-unit">
+          <input
+            type="text"
+            value={formatValue(data.period, "period")}
+            readOnly
+          />
+          <select
+            value={selectedUnits.period}
+            onChange={(e) => handleUnitChange("period", e.target.value)}
+            disabled={!connected || loading}
+          >
+            {unitConversions.period.map((unit) => (
+              <option key={unit.label} value={unit.label}>
+                {unit.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => fetchMetric("period")}
           disabled={!connected || loading}

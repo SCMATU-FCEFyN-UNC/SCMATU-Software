@@ -45,6 +45,10 @@ describe("MonitoringPanel", () => {
     const inputs = screen.getAllByRole("textbox");
     expect(inputs).toHaveLength(6); // Should have 6 input fields
 
+    // Check that we have unit selectors for phase, current, power, and period
+    const selectors = screen.getAllByRole("combobox");
+    expect(selectors).toHaveLength(4); // phase, current, power, period
+
     // Verify all inputs are empty
     inputs.forEach((input) => {
       expect(input).toHaveValue("");
@@ -92,7 +96,7 @@ describe("MonitoringPanel", () => {
     expect(screen.getByDisplayValue("220.500")).toBeInTheDocument(); // voltage
     expect(screen.getByDisplayValue("5.2000")).toBeInTheDocument(); // current
     expect(screen.getByDisplayValue("1146.600")).toBeInTheDocument(); // power
-    expect(screen.getByDisplayValue("2.000e-2")).toBeInTheDocument(); // period
+    expect(screen.getByDisplayValue("0.020000")).toBeInTheDocument(); // period
     expect(screen.getByDisplayValue("50.000")).toBeInTheDocument(); // resonance frequency (actual value from HTML)
     expect(
       screen.getByText("Status: obtained successfully")
@@ -371,6 +375,186 @@ describe("MonitoringPanel", () => {
     const refreshButtons = screen.getAllByText("Refresh");
     refreshButtons.forEach((button) => {
       expect(button).toBeDisabled();
+    });
+  });
+
+  it("shows phase relationships correctly", async () => {
+    const mockData = {
+      phase: -1874, // Negative phase - current leads voltage
+      voltage: 220.5,
+      current: 5.2,
+      power: 1146.6,
+      period: 0.02,
+      resonance: {
+        resonance_frequency: 50000,
+        status_text: "obtained successfully",
+      },
+    };
+
+    mockMakeRequest.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockData,
+      },
+    });
+
+    await act(async () => {
+      render(<MonitoringPanel />);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("🔄 Refresh All"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("(current leads voltage)")).toBeInTheDocument();
+    });
+
+    // Test positive phase - voltage leads current
+    const mockDataPositive = {
+      ...mockData,
+      phase: 1874,
+    };
+
+    mockMakeRequest.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockDataPositive,
+      },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("🔄 Refresh All"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("(voltage leads current)")).toBeInTheDocument();
+    });
+
+    // Test zero phase - in phase
+    const mockDataZero = {
+      ...mockData,
+      phase: 0,
+    };
+
+    mockMakeRequest.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockDataZero,
+      },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("🔄 Refresh All"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("(in phase)")).toBeInTheDocument();
+    });
+  });
+
+  it("allows unit selection changes", async () => {
+    const mockData = {
+      phase: 1234, // 1234 ns
+      voltage: 220.5,
+      current: 1.5, // 1.5 A
+      power: 330.75, // 330.75 VA
+      period: 0.001, // 0.001 s
+      resonance: {
+        resonance_frequency: 50000,
+        status_text: "obtained successfully",
+      },
+    };
+
+    mockMakeRequest.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockData,
+      },
+    });
+
+    await act(async () => {
+      render(<MonitoringPanel />);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("🔄 Refresh All"));
+    });
+
+    // Get all unit selectors
+    const selectors = screen.getAllByRole("combobox");
+
+    // Change phase from ns to µs
+    await act(async () => {
+      fireEvent.change(selectors[0], { target: { value: "µs" } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("1.234")).toBeInTheDocument(); // 1234 ns = 1.234 µs
+    });
+
+    // Change current from A to mA
+    await act(async () => {
+      fireEvent.change(selectors[1], { target: { value: "mA" } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("1500.0000")).toBeInTheDocument(); // 1.5 A = 1500 mA
+    });
+
+    // Change power from VA to kVA
+    await act(async () => {
+      fireEvent.change(selectors[2], { target: { value: "kVA" } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("0.331")).toBeInTheDocument(); // 330.75 VA = 0.33075 kVA
+    });
+
+    // Change period from s to ms
+    await act(async () => {
+      fireEvent.change(selectors[3], { target: { value: "ms" } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("1.000000")).toBeInTheDocument(); // 0.001 s = 1 ms
+    });
+  });
+
+  it("disables unit selectors when disconnected", async () => {
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: vi.fn(),
+      selectedPort: "",
+      setSelectedPort: vi.fn(),
+    });
+
+    await act(async () => {
+      render(<MonitoringPanel />);
+    });
+
+    const selectors = screen.getAllByRole("combobox");
+    selectors.forEach((selector) => {
+      expect(selector).toBeDisabled();
+    });
+  });
+
+  it("disables unit selectors when loading", async () => {
+    mockMakeRequest.mockImplementation(() => new Promise(() => {})); // Never resolves
+
+    await act(async () => {
+      render(<MonitoringPanel />);
+    });
+
+    const refreshAllButton = screen.getByText("🔄 Refresh All");
+
+    await act(async () => {
+      fireEvent.click(refreshAllButton);
+    });
+
+    const selectors = screen.getAllByRole("combobox");
+    selectors.forEach((selector) => {
+      expect(selector).toBeDisabled();
     });
   });
 });

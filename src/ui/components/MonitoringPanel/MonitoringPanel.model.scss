@@ -86,3 +86,16 @@
   color: #333;
   text-align: center;
 }
+
+.input-with-unit {
+  display: flex;
+  gap: 8px;
+  
+  input {
+    flex: 1;
+  }
+  
+  select {
+    width: 80px;
+  }
+}
