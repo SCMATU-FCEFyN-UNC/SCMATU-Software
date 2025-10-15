@@ -3,8 +3,13 @@ import "./MonitoringPanel.model.scss";
 import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
 
+interface PhaseData {
+  seconds: number;
+  degrees: number;
+}
+
 interface MonitoringData {
-  phase: number | null;
+  phase: PhaseData | null;
   voltage: number | null;
   current: number | null;
   power: number | null;
@@ -17,31 +22,32 @@ type UnitType = "phase" | "current" | "power" | "period";
 
 interface UnitConfig {
   label: string;
-  convert: (value: number) => number;
+  convert: (seconds: number) => number; // Always from seconds
 }
 
 const unitConversions: Record<UnitType, UnitConfig[]> = {
   phase: [
-    { label: "ns", convert: (val) => val },
-    { label: "µs", convert: (val) => val / 1000 },
-    { label: "ms", convert: (val) => val / 1000000 },
+    { label: "ns", convert: (s) => s * 1e9 },
+    { label: "µs", convert: (s) => s * 1e6 },
+    { label: "ms", convert: (s) => s * 1e3 },
+    { label: "s", convert: (s) => s },
   ],
   current: [
-    { label: "A", convert: (val) => val },
-    { label: "mA", convert: (val) => val * 1000 },
-    { label: "µA", convert: (val) => val * 1000000 },
+    { label: "A", convert: (v) => v },
+    { label: "mA", convert: (v) => v * 1000 },
+    { label: "µA", convert: (v) => v * 1000000 },
   ],
   power: [
-    { label: "VA", convert: (val) => val },
-    { label: "kVA", convert: (val) => val / 1000 },
-    { label: "mVA", convert: (val) => val * 1000 },
-    { label: "µVA", convert: (val) => val * 1000000 },
+    { label: "VA", convert: (v) => v },
+    { label: "kVA", convert: (v) => v / 1000 },
+    { label: "mVA", convert: (v) => v * 1000 },
+    { label: "µVA", convert: (v) => v * 1000000 },
   ],
   period: [
-    { label: "s", convert: (val) => val },
-    { label: "ms", convert: (val) => val * 1000 },
-    { label: "µs", convert: (val) => val * 1000000 },
-    { label: "ns", convert: (val) => val * 1000000000 },
+    { label: "s", convert: (v) => v },
+    { label: "ms", convert: (v) => v * 1000 },
+    { label: "µs", convert: (v) => v * 1000000 },
+    { label: "ns", convert: (v) => v * 1000000000 },
   ],
 };
 
@@ -59,7 +65,6 @@ const MonitoringPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Unit selection state
   const [selectedUnits, setSelectedUnits] = useState<Record<UnitType, string>>({
     phase: "ns",
     current: "A",
@@ -67,80 +72,67 @@ const MonitoringPanel: React.FC = () => {
     period: "s",
   });
 
+  // phase angle unit (° or rad)
+  const [phaseAngleUnit, setPhaseAngleUnit] = useState<"deg" | "rad">("deg");
+
   const { makeRequest } = useBackendRequest();
   const { connected } = useConnection();
 
-  // Helper function to format phase values with proper precision and lead/lag indication
-  const formatPhaseValue = (value: number | null, unit: string): string => {
-    if (value === null) return "";
+  // Helper: phase sign meaning
+  const getPhaseRelationship = (phase: PhaseData | null): string => {
+    if (!phase) return "";
+    const value = phase.seconds;
+    if (value === 0) return "(in phase)";
+    if (value < 0) return "(current leads voltage)";
+    return "(voltage leads current)";
+  };
 
-    const absValue = Math.abs(value);
-    let convertedValue: number;
+  // Helper: format phase time value
+  const formatPhaseTime = (phase: PhaseData | null, unit: string): string => {
+    if (!phase) return "";
+    const converter = unitConversions.phase.find((u) => u.label === unit);
+    if (!converter) return "";
+    const value = converter.convert(Math.abs(phase.seconds)); // ← absolute value (no sign)
+    // Keep full precision, trim unnecessary zeros
+    return value.toPrecision(6).replace(/\.?0+$/, "");
+  };
 
-    if (unit === "ns") {
-      convertedValue = absValue;
-    } else if (unit === "µs") {
-      convertedValue = absValue / 1000;
+  // format phase angle (degrees ↔ radians) now keeps the sign
+  const formatPhaseAngle = (phase: PhaseData | null): string => {
+    if (!phase) return "";
+    const deg = phase.degrees; // signed value
+
+    if (phaseAngleUnit === "deg") {
+      return deg.toFixed(2) + "°";
     } else {
-      // ms
-      convertedValue = absValue / 1000000;
-    }
-
-    // Use maximum precision without rounding
-    if (unit === "ns") {
-      return convertedValue.toFixed(0);
-    } else if (unit === "µs") {
-      // Show up to 3 decimal places for microseconds
-      return convertedValue.toFixed(3);
-    } else {
-      // ms
-      // Show up to 6 decimal places for milliseconds
-      return convertedValue.toFixed(6);
+      const radRatio = deg / 180; // π rad = 180°
+      const formatted = radRatio.toFixed(3).replace(/\.?0+$/, "");
+      return `${formatted}π`;
     }
   };
 
-  // Helper function to get phase lead/lag information
-  const getPhaseRelationship = (phase: number | null): string => {
-    if (phase === null) return "";
-    if (phase === 0) return " (in phase)";
-    if (phase < 0) return " (current leads voltage)";
-    return " (voltage leads current)";
+  const handleUnitChange = (type: UnitType, newUnit: string) => {
+    setSelectedUnits((prev) => ({ ...prev, [type]: newUnit }));
   };
 
-  // Helper function to format other values based on selected unit
+  // 🟢 Added: handle phase angle unit change
+  const handleAngleUnitChange = (newUnit: "deg" | "rad") => {
+    setPhaseAngleUnit(newUnit);
+  };
+
   const formatValue = (value: number | null, type: UnitType): string => {
     if (value === null) return "";
-
-    const currentUnit = selectedUnits[type];
-    const unitConfig = unitConversions[type].find(
-      (unit) => unit.label === currentUnit
-    );
-
-    if (!unitConfig) return value.toString();
-
-    const convertedValue = unitConfig.convert(value);
-
-    // Apply appropriate formatting based on the value magnitude
-    if (type === "current") {
-      return convertedValue.toFixed(4);
-    } else if (type === "power") {
-      return convertedValue.toFixed(3);
-    } else if (type === "period") {
-      // Use scientific notation for very small period values
-      return convertedValue < 0.001
-        ? convertedValue.toExponential(3)
-        : convertedValue.toFixed(6);
-    }
-
-    return convertedValue.toString();
-  };
-
-  // Handle unit change
-  const handleUnitChange = (type: UnitType, newUnit: string) => {
-    setSelectedUnits((prev) => ({
-      ...prev,
-      [type]: newUnit,
-    }));
+    const unit = selectedUnits[type];
+    const config = unitConversions[type].find((u) => u.label === unit);
+    if (!config) return value.toString();
+    const converted = config.convert(value);
+    if (type === "current") return converted.toFixed(4);
+    if (type === "power") return converted.toFixed(3);
+    if (type === "period")
+      return converted < 0.001
+        ? converted.toExponential(3)
+        : converted.toFixed(6);
+    return converted.toString();
   };
 
   async function fetchAllMetrics() {
@@ -148,11 +140,12 @@ const MonitoringPanel: React.FC = () => {
       setLoading(true);
       setMessage(null);
       const response = await makeRequest("/monitoring", { method: "GET" });
-
       if (response.data.success) {
         const d = response.data.data;
         setData({
-          phase: d.phase,
+          phase: d.phase
+            ? { seconds: d.phase.seconds, degrees: d.phase.degrees }
+            : null,
           voltage: d.voltage,
           current: d.current,
           power: d.power,
@@ -185,7 +178,6 @@ const MonitoringPanel: React.FC = () => {
         return;
       }
 
-      // Handle special cases
       if (metric === "resonance") {
         const r = response.data.resonance;
         setData((prev) => ({
@@ -197,8 +189,14 @@ const MonitoringPanel: React.FC = () => {
       } else if (metric === "period") {
         setData((prev) => ({ ...prev, period: response.data.period }));
         setMessage("✅ Period updated");
+      } else if (metric === "phase") {
+        const p = response.data.phase;
+        setData((prev) => ({
+          ...prev,
+          phase: p ? { seconds: p.seconds, degrees: p.degrees } : null,
+        }));
+        setMessage("✅ Phase updated");
       } else {
-        // Normal single value metric
         setData((prev) => ({ ...prev, [metric]: response.data[metric] }));
         setMessage(`✅ ${metric} updated`);
       }
@@ -214,27 +212,53 @@ const MonitoringPanel: React.FC = () => {
     <div className="panel">
       <h2>Monitoring Panel</h2>
 
-      <div className="fieldGroup">
+      {/* PHASE */}
+      <div className="monitoring-fieldGroup">
         <label>Phase Difference</label>
-        <div className="input-with-unit">
-          <input
-            type="text"
-            value={formatPhaseValue(data.phase, selectedUnits.phase)}
-            readOnly
-          />
-          <select
-            value={selectedUnits.phase}
-            onChange={(e) => handleUnitChange("phase", e.target.value)}
-            disabled={!connected || loading}
-          >
-            {unitConversions.phase.map((unit) => (
-              <option key={unit.label} value={unit.label}>
-                {unit.label}
-              </option>
-            ))}
-          </select>
+        <div className="input-row">
+          <div>
+            <div className="input-with-unit" style={{ flex: 1 }}>
+              <input
+                type="text"
+                value={formatPhaseTime(data.phase, selectedUnits.phase)}
+                readOnly
+              />
+              <select
+                value={selectedUnits.phase}
+                onChange={(e) => handleUnitChange("phase", e.target.value)}
+                disabled={!connected || loading}
+              >
+                {unitConversions.phase.map((unit) => (
+                  <option key={unit.label} value={unit.label}>
+                    {unit.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <div className="input-with-unit">
+              <input
+                type="text"
+                value={formatPhaseAngle(data.phase)}
+                readOnly
+              />
+              {/* 🟢 Changed: selectable degrees/radians */}
+              <select
+                value={phaseAngleUnit}
+                onChange={(e) =>
+                  handleAngleUnitChange(e.target.value as "deg" | "rad")
+                }
+                disabled={!connected || loading}
+              >
+                <option value="deg">°</option>
+                <option value="rad">rad</option>
+              </select>
+            </div>
+          </div>
         </div>
-        {data.phase !== null && (
+
+        {data.phase && (
           <small className="phase-relationship">
             {getPhaseRelationship(data.phase)}
           </small>
@@ -247,13 +271,16 @@ const MonitoringPanel: React.FC = () => {
         </button>
       </div>
 
-      <div className="fieldGroup">
+      {/* VOLTAGE */}
+      <div className="monitoring-fieldGroup">
         <label>Voltage (V)</label>
-        <input
-          type="text"
-          value={data.voltage !== null ? data.voltage.toFixed(3) : ""}
-          readOnly
-        />
+        <div className="no-unit-input">
+          <input
+            type="text"
+            value={data.voltage !== null ? data.voltage.toFixed(3) : ""}
+            readOnly
+          />
+        </div>
         <button
           onClick={() => fetchMetric("voltage")}
           disabled={!connected || loading}
@@ -262,7 +289,8 @@ const MonitoringPanel: React.FC = () => {
         </button>
       </div>
 
-      <div className="fieldGroup">
+      {/* CURRENT */}
+      <div className="monitoring-fieldGroup">
         <label>Current</label>
         <div className="input-with-unit">
           <input
@@ -290,7 +318,8 @@ const MonitoringPanel: React.FC = () => {
         </button>
       </div>
 
-      <div className="fieldGroup">
+      {/* POWER */}
+      <div className="monitoring-fieldGroup">
         <label>Power</label>
         <div className="input-with-unit">
           <input
@@ -318,7 +347,8 @@ const MonitoringPanel: React.FC = () => {
         </button>
       </div>
 
-      <div className="fieldGroup">
+      {/* PERIOD */}
+      <div className="monitoring-fieldGroup">
         <label>Signal Period</label>
         <div className="input-with-unit">
           <input
@@ -346,17 +376,20 @@ const MonitoringPanel: React.FC = () => {
         </button>
       </div>
 
-      <div className="fieldGroup">
+      {/* RESONANCE */}
+      <div className="monitoring-fieldGroup">
         <label>Resonance Frequency (Hz)</label>
-        <input
-          type="text"
-          value={
-            data.resonance_frequency !== null
-              ? data.resonance_frequency.toLocaleString()
-              : ""
-          }
-          readOnly
-        />
+        <div className="no-unit-input">
+          <input
+            type="text"
+            value={
+              data.resonance_frequency !== null
+                ? data.resonance_frequency.toLocaleString()
+                : ""
+            }
+            readOnly
+          />
+        </div>
         {data.resonance_status && (
           <small>Status: {data.resonance_status}</small>
         )}
