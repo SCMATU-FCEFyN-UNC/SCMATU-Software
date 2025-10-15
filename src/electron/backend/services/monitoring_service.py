@@ -33,8 +33,11 @@ def get_phase(slave: int = 20) -> float:
         raise ValueError("Phase measurement timeout - device not ready")
 
     phase_ns = manager.read("input", slave, 2)  
+    
+    if phase_ns is None:
+        raise ValueError("Failed to read phase register")
 
-    # interpret as signed 16-bit
+    # Now safe to compare since we checked for None
     if phase_ns >= 32768:
         phase_ns -= 65536
 

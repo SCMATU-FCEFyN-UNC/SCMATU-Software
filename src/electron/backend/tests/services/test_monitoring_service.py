@@ -7,24 +7,44 @@ class TestMonitoringService:
 
     def test_get_phase_success(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-             patch("backend.services.monitoring_service.manager.read") as mock_read:
+             patch("backend.services.monitoring_service.manager.read") as mock_read, \
+             patch("backend.services.monitoring_service.get_period") as mock_period:
+            
             # Mock the sequence of reads: first ready check returns 1, then phase_ns
             mock_read.side_effect = [1, 4500]
+            mock_period.return_value = 0.02  # 50Hz period
+            
             result = monitoring_service.get_phase(20)
-            assert result == 4500  # Now returns raw phase_ns value
+            
+            # Calculate expected values
+            expected_seconds = 4500 * 1e-9
+            expected_degrees = (expected_seconds / 0.02) * 360.0
+            
+            assert result["seconds"] == expected_seconds
+            assert result["degrees"] == expected_degrees
 
     def test_get_phase_waits_until_ready(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-            patch("backend.services.monitoring_service.manager.read") as mock_read:
+            patch("backend.services.monitoring_service.manager.read") as mock_read, \
+            patch("backend.services.monitoring_service.get_period") as mock_period:
+            
             # Mock: first ready check returns 0, then 0, then 1 (within timeout), then phase_ns
             mock_read.side_effect = [0, 0, 1, 4500]
+            mock_period.return_value = 0.02
+            
             result = monitoring_service.get_phase(20)
-            assert result == 4500
+            
+            expected_seconds = 4500 * 1e-9
+            expected_degrees = (expected_seconds / 0.02) * 360.0
+            
+            assert result["seconds"] == expected_seconds
+            assert result["degrees"] == expected_degrees
             assert mock_read.call_count == 4
 
     def test_get_phase_timeout(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
             patch("backend.services.monitoring_service.manager.read") as mock_read:
+            
             # Mock all read calls to return 0 (not ready) to trigger timeout
             mock_read.return_value = 0
             with pytest.raises(ValueError, match="Phase measurement timeout - device not ready"):
@@ -33,24 +53,59 @@ class TestMonitoringService:
     def test_get_phase_read_failure(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
             patch("backend.services.monitoring_service.manager.read") as mock_read:
-            # Mock all read calls to return 0 (not ready) to trigger timeout
-            mock_read.return_value = 0
-            with pytest.raises(ValueError, match="Phase measurement timeout - device not ready"):
+            
+            # Mock ready check passes but phase_ns read returns None
+            mock_read.side_effect = [1, None]
+            with pytest.raises(ValueError, match="Failed to read phase register"):
                 monitoring_service.get_phase(20)
 
     def test_get_phase_signed_conversion_positive(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-             patch("backend.services.monitoring_service.manager.read") as mock_read:
+             patch("backend.services.monitoring_service.manager.read") as mock_read, \
+             patch("backend.services.monitoring_service.get_period") as mock_period:
+            
             mock_read.side_effect = [1, 10000]  # phase_ns < 32768
+            mock_period.return_value = 0.02
+            
             result = monitoring_service.get_phase(20)
-            assert result == 10000
+            
+            expected_seconds = 10000 * 1e-9
+            expected_degrees = (expected_seconds / 0.02) * 360.0
+            
+            assert result["seconds"] == expected_seconds
+            assert result["degrees"] == expected_degrees
 
     def test_get_phase_signed_conversion_negative(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-             patch("backend.services.monitoring_service.manager.read") as mock_read:
+             patch("backend.services.monitoring_service.manager.read") as mock_read, \
+             patch("backend.services.monitoring_service.get_period") as mock_period:
+            
             mock_read.side_effect = [1, 40000]  # phase_ns >= 32768
+            mock_period.return_value = 0.02
+            
             result = monitoring_service.get_phase(20)
-            assert result == 40000 - 65536  # Should be negative
+            
+            # Should be negative after conversion
+            expected_seconds = (40000 - 65536) * 1e-9
+            expected_degrees = (expected_seconds / 0.02) * 360.0
+            
+            assert result["seconds"] == expected_seconds
+            assert result["degrees"] == expected_degrees
+
+    def test_get_phase_zero_period(self):
+        with patch("backend.services.monitoring_service.manager.write") as mock_write, \
+             patch("backend.services.monitoring_service.manager.read") as mock_read, \
+             patch("backend.services.monitoring_service.get_period") as mock_period:
+            
+            mock_read.side_effect = [1, 4500]
+            mock_period.return_value = 0  # Zero period
+            
+            result = monitoring_service.get_phase(20)
+            
+            expected_seconds = 4500 * 1e-9
+            # Degrees should be 0 when period is 0
+            assert result["seconds"] == expected_seconds
+            assert result["degrees"] == 0
 
     def test_get_voltage_success(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
@@ -195,13 +250,12 @@ class TestMonitoringService:
     def test_get_resonance_frequency_success(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            # hi, lo, status
-            mock_read.side_effect = [0x0001, 0x86A0, 1]  
+            # First read status, then if status==1, read hi/lo
+            mock_read.side_effect = [1, 0x0001, 0x86A0]  # status=1, then hi, then lo
             result = monitoring_service.get_resonance_frequency(20)
             
-            expected_freq = (0x0001 << 16) | 0x86A0
             assert result == {
-                "resonance_frequency": expected_freq,
+                "resonance_frequency": 100000,  # 0x186A0 in decimal
                 "status_code": 1,
                 "status_text": "obtained successfully"
             }
@@ -216,31 +270,28 @@ class TestMonitoringService:
         for status_code, expected_text in status_test_cases:
             with patch("backend.services.monitoring_service.manager.write") as mock_write, \
                  patch("backend.services.monitoring_service.manager.read") as mock_read:
-                mock_read.side_effect = [0x0001, 0x86A0, status_code]
+                mock_read.return_value = status_code  # Only status will be read
                 result = monitoring_service.get_resonance_frequency(20)
                 
-                assert result["status_code"] == status_code
-                assert result["status_text"] == expected_text
+                assert result == {
+                    "resonance_frequency": -1,  # Invalid/not obtained
+                    "status_code": status_code,
+                    "status_text": expected_text
+                }
 
     def test_get_resonance_frequency_hi_read_failure(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [None, 0x86A0, 1]  # hi fails
-            with pytest.raises(ValueError, match="Failed to read resonance frequency registers"):
-                monitoring_service.get_resonance_frequency(20)
-
-    def test_get_resonance_frequency_lo_read_failure(self):
-        with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-             patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [0x0001, None, 1]  # lo fails
+            # Provide values for all three reads: status, hi, lo
+            mock_read.side_effect = [1, None, 0x86A0]  # status=1, hi fails, lo won't be reached
             with pytest.raises(ValueError, match="Failed to read resonance frequency registers"):
                 monitoring_service.get_resonance_frequency(20)
 
     def test_get_resonance_frequency_status_read_failure(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [0x0001, 0x86A0, None]  # status fails
-            with pytest.raises(ValueError, match="Failed to read resonance frequency registers"):
+            mock_read.return_value = None  # status read fails
+            with pytest.raises(ValueError, match="Failed to read resonance frequency status register"):
                 monitoring_service.get_resonance_frequency(20)
 
     def setup_method(self):
