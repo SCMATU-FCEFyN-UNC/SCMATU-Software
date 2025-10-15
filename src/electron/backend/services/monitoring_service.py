@@ -40,7 +40,12 @@ def get_phase(slave: int = 20) -> float:
 
     if phase_ns is None:
         raise ValueError("Failed to read phase register")
-    return phase_ns
+    
+    phase_s = phase_ns * 1e-9
+    period = get_period()
+    phase_deg = (phase_s / period) * 360.0 if period > 0 else 0
+
+    return {"seconds": phase_s, "degrees": phase_deg}
 
 def get_voltage(slave: int = 20) -> float:
     """Read peak voltage (V) from ADC and calibration gain."""
