@@ -116,41 +116,41 @@ def get_period(slave: int = 20) -> float:
 
 def get_resonance_frequency(slave: int = 20):
     """
-    Triggers resonance frequency measurement by writing coil 5,
-    waits 3 seconds, then reads resonance frequency and its status.
-    Uses three registers: hi (5), lo (6), status (7).
+    Reads the resonance frequency status and (if available) its value.
+    Uses three registers: hi (6), lo (7), status (8).
+
     Status codes:
         0 -> "not obtained"
         1 -> "obtained successfully"
         2 -> "failed to obtain"
     """
-    # Trigger resonance frequency measurement
-    manager.write("coil", slave, 5, 1)
-
-    # Wait 3 seconds for measurement to complete
-    time.sleep(3)
-
-    # Read frequency high, low, and status registers
-    hi = manager.read("input", slave, 6)
-    lo = manager.read("input", slave, 7)
+    # Read only the status register first
     status = manager.read("input", slave, 8)
 
-    if hi is None or lo is None or status is None:
-        raise ValueError("Failed to read resonance frequency registers")
+    if status is None:
+        raise ValueError("Failed to read resonance frequency status register")
 
-    # Combine hi and lo into a single 32-bit frequency
-    freq = (hi << 16) | lo
-
-    # Translate status code
     status_texts = {
         0: "not obtained",
         1: "obtained successfully",
-        2: "failed to obtain"
+        2: "failed to obtain",
     }
     status_text = status_texts.get(status, f"unknown ({status})")
+
+    # Only read hi/lo if measurement succeeded
+    if status == 1:
+        hi = manager.read("input", slave, 6)
+        lo = manager.read("input", slave, 7)
+
+        if hi is None or lo is None:
+            raise ValueError("Failed to read resonance frequency registers")
+
+        freq = (hi << 16) | lo
+    else:
+        freq = -1  # indicate not obtained or failed
 
     return {
         "resonance_frequency": freq,
         "status_code": status,
-        "status_text": status_text
+        "status_text": status_text,
     }
