@@ -41,9 +41,3 @@ def set_sample_count(sample_count: int):
         raise ValueError("Sample count must be positive")
     manager.write("holding", 20, 5, sample_count)
     return {"success": True, "samples": sample_count}
-
-def set_frequency_step(step_hz: int):
-    if step_hz <= 0:
-        raise ValueError("Step must be positive")
-    manager.write("holding", 20, 6, step_hz)
-    return {"success": True, "frequency_step": step_hz}

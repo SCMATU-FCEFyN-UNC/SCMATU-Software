@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
 from flask import Flask
-from backend.routes.monitoring import monitoring_bp
+from backend.routes.monitoring import monitoring_bp  # Correct import path
 
 class TestMonitoringEndpoints:
     """Test suite for monitoring endpoints"""
@@ -13,7 +13,7 @@ class TestMonitoringEndpoints:
             "current": 5.0,
             "power": 1100.0,
             "period": 0.02,
-            "resonance": {"resonance_frequency": 50000, "status": 1}
+            "resonance": {"resonance_frequency": 50000, "status": 1},
         }
 
         with patch("backend.routes.monitoring.get_phase", return_value=mock_data["phase"]) as mock_phase:

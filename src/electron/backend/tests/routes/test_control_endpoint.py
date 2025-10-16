@@ -94,28 +94,12 @@ class TestControlRoutes:
             assert data["success"] is False
             assert "error" in data
 
-    def test_set_frequency_step_success(self, client):
-        with patch.object(control_service, "set_frequency_step", return_value={"success": True, "frequency_step": 5}):
-            response = client.post("/frequency-step", json={"step_hz": 5})
-            assert response.status_code == 200
-            data = response.get_json()
-            assert data["success"] is True
-            assert data["frequency_step"] == 5
-
-    def test_set_frequency_step_invalid(self, client):
-        with patch.object(control_service, "set_frequency_step", side_effect=ValueError("Step must be positive")):
-            response = client.post("/frequency-step", json={"step_hz": 0})
-            assert response.status_code == 400
-            data = response.get_json()
-            assert data["success"] is False
-            assert "error" in data
-
 
 @pytest.fixture
 def client():
     """Flask test client fixture with registered control_bp blueprint."""
     from flask import Flask
-    from backend.routes.control import control_bp
+    from backend.routes.control import control_bp  # Correct import path
     
     app = Flask(__name__)
     app.register_blueprint(control_bp, url_prefix='/')

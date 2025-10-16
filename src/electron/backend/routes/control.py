@@ -53,16 +53,3 @@ def set_sample_count_endpoint():
         return jsonify(result), 200
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
-
-
-@control_bp.route("/frequency-step", methods=["POST"])
-def set_frequency_step_endpoint():
-    """Set frequency step (Hz) used for resonance search."""
-    data = request.get_json() or {}
-    step = int(data.get("step_hz", 0))
-
-    try:
-        result = control_service.set_frequency_step(step)
-        return jsonify(result), 200
-    except ValueError as e:
-        return jsonify({"success": False, "error": str(e)}), 400

@@ -1,4 +1,3 @@
-# services/monitoring_service.py
 from backend.services.connection_manager import manager
 from backend.services.control_service import get_frequency
 import time
@@ -126,6 +125,7 @@ def get_resonance_frequency(slave: int = 20):
         0 -> "not obtained"
         1 -> "obtained successfully"
         2 -> "failed to obtain"
+        3 -> "measurement in progress"
     """
     # Read only the status register first
     status = manager.read("input", slave, 8)
@@ -137,6 +137,7 @@ def get_resonance_frequency(slave: int = 20):
         0: "not obtained",
         1: "obtained successfully",
         2: "failed to obtain",
+        3: "measurement in progress",
     }
     status_text = status_texts.get(status, f"unknown ({status})")
 

@@ -264,7 +264,8 @@ class TestMonitoringService:
         status_test_cases = [
             (0, "not obtained"),
             (2, "failed to obtain"),
-            (3, "unknown (3)")  # unknown status
+            (3, "measurement in progress"),  # Changed to match new status text
+            (4, "unknown (4)")  # Test unknown status with a number not in the mapping
         ]
         
         for status_code, expected_text in status_test_cases:

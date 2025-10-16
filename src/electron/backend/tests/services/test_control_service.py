@@ -55,14 +55,3 @@ class TestControlService:
     def test_set_sample_count_invalid(self):
         with pytest.raises(ValueError, match="Sample count must be positive"):
             control_service.set_sample_count(0)
-
-    def test_set_frequency_step_valid(self):
-        with patch("backend.services.control_service.manager.write") as mock_write:
-            result = control_service.set_frequency_step(50)
-            assert result["success"]
-            assert result["frequency_step"] == 50
-            mock_write.assert_called_once_with("holding", 20, 6, 50)
-
-    def test_set_frequency_step_invalid(self):
-        with pytest.raises(ValueError, match="Step must be positive"):
-            control_service.set_frequency_step(0)
