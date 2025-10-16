@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
+import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 import "./CommunicationPanel.model.scss";
 
 interface PortInfo {
@@ -21,6 +22,7 @@ const CommunicationPanel: React.FC = () => {
   const { makeRequest } = useBackendRequest();
   const { connected, setConnected, selectedPort, setSelectedPort } =
     useConnection();
+  const { running } = useResonanceStatus();
 
   // Track last fetch request to avoid race condition overwriting
   const lastRequestId = useRef(0);
@@ -197,7 +199,7 @@ const CommunicationPanel: React.FC = () => {
             {loading ? "Connecting..." : "Connect"}
           </button>
         ) : (
-          <button onClick={handleDisconnect} disabled={loading}>
+          <button onClick={handleDisconnect} disabled={loading || running}>
             {loading ? "Disconnecting..." : "Disconnect"}
           </button>
         )}

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./ControlPanel.model.scss";
 import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
+import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 
 const ControlPanel: React.FC = () => {
   const [frequency, setFrequency] = useState<number>(60000);
@@ -14,6 +15,10 @@ const ControlPanel: React.FC = () => {
 
   const { makeRequest } = useBackendRequest();
   const { connected } = useConnection();
+  const { running } = useResonanceStatus();
+
+  // Helper to check if interactions should be disabled
+  const isDisabled = !connected || loading || running;
 
   async function handleSetFrequency() {
     await handleRequest(
@@ -95,14 +100,14 @@ const ControlPanel: React.FC = () => {
         <input
           type="number"
           value={frequency}
-          disabled={!connected}
+          disabled={isDisabled}
           onChange={(e) => setFrequency(Number(e.target.value))}
         />
         <div className="buttons">
-          <button onClick={handleSetFrequency} disabled={loading || !connected}>
+          <button onClick={handleSetFrequency} disabled={isDisabled}>
             Set
           </button>
-          <button onClick={handleGetFrequency} disabled={loading || !connected}>
+          <button onClick={handleGetFrequency} disabled={isDisabled}>
             Get
           </button>
         </div>
@@ -115,10 +120,10 @@ const ControlPanel: React.FC = () => {
           value={power}
           min={0}
           max={100}
-          disabled={!connected}
+          disabled={isDisabled}
           onChange={(e) => setPower(Number(e.target.value))}
         />
-        <button onClick={handleSetPower} disabled={loading || !connected}>
+        <button onClick={handleSetPower} disabled={isDisabled}>
           Set
         </button>
       </div>
@@ -129,10 +134,10 @@ const ControlPanel: React.FC = () => {
           type="number"
           value={samples}
           min={1}
-          disabled={!connected}
+          disabled={isDisabled}
           onChange={(e) => setSamples(Number(e.target.value))}
         />
-        <button onClick={handleSetSamples} disabled={loading || !connected}>
+        <button onClick={handleSetSamples} disabled={isDisabled}>
           Set
         </button>
       </div>
@@ -143,10 +148,10 @@ const ControlPanel: React.FC = () => {
           type="number"
           value={step}
           min={1}
-          disabled={!connected}
+          disabled={isDisabled}
           onChange={(e) => setStep(Number(e.target.value))}
         />
-        <button onClick={handleSetStep} disabled={loading || !connected}>
+        <button onClick={handleSetStep} disabled={isDisabled}>
           Set
         </button>
       </div>

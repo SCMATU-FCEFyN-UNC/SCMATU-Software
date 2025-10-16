@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import "./MonitoringPanel.model.scss";
 import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
+import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
+import ResonanceModal from "../ResonanceModal/ResonanceModal";
 
 interface PhaseData {
   seconds: number;
@@ -77,6 +79,9 @@ const MonitoringPanel: React.FC = () => {
 
   const { makeRequest } = useBackendRequest();
   const { connected } = useConnection();
+
+  // Add state for modal
+  const [showResonanceModal, setShowResonanceModal] = useState(false);
 
   // Helper: phase sign meaning
   const getPhaseRelationship = (phase: PhaseData | null): string => {
@@ -208,6 +213,12 @@ const MonitoringPanel: React.FC = () => {
     }
   }
 
+  // Get running state from context
+  const { running } = useResonanceStatus();
+
+  // Helper to check if interactions should be disabled
+  const isDisabled = !connected || loading || running;
+
   return (
     <div className="panel">
       <h2>Monitoring Panel</h2>
@@ -226,7 +237,7 @@ const MonitoringPanel: React.FC = () => {
               <select
                 value={selectedUnits.phase}
                 onChange={(e) => handleUnitChange("phase", e.target.value)}
-                disabled={!connected || loading}
+                disabled={isDisabled}
               >
                 {unitConversions.phase.map((unit) => (
                   <option key={unit.label} value={unit.label}>
@@ -249,7 +260,7 @@ const MonitoringPanel: React.FC = () => {
                 onChange={(e) =>
                   handleAngleUnitChange(e.target.value as "deg" | "rad")
                 }
-                disabled={!connected || loading}
+                disabled={isDisabled}
               >
                 <option value="deg">°</option>
                 <option value="rad">rad</option>
@@ -263,10 +274,7 @@ const MonitoringPanel: React.FC = () => {
             {getPhaseRelationship(data.phase)}
           </small>
         )}
-        <button
-          onClick={() => fetchMetric("phase")}
-          disabled={!connected || loading}
-        >
+        <button onClick={() => fetchMetric("phase")} disabled={isDisabled}>
           Refresh
         </button>
       </div>
@@ -281,10 +289,7 @@ const MonitoringPanel: React.FC = () => {
             readOnly
           />
         </div>
-        <button
-          onClick={() => fetchMetric("voltage")}
-          disabled={!connected || loading}
-        >
+        <button onClick={() => fetchMetric("voltage")} disabled={isDisabled}>
           Refresh
         </button>
       </div>
@@ -301,7 +306,7 @@ const MonitoringPanel: React.FC = () => {
           <select
             value={selectedUnits.current}
             onChange={(e) => handleUnitChange("current", e.target.value)}
-            disabled={!connected || loading}
+            disabled={isDisabled}
           >
             {unitConversions.current.map((unit) => (
               <option key={unit.label} value={unit.label}>
@@ -310,10 +315,7 @@ const MonitoringPanel: React.FC = () => {
             ))}
           </select>
         </div>
-        <button
-          onClick={() => fetchMetric("current")}
-          disabled={!connected || loading}
-        >
+        <button onClick={() => fetchMetric("current")} disabled={isDisabled}>
           Refresh
         </button>
       </div>
@@ -330,7 +332,7 @@ const MonitoringPanel: React.FC = () => {
           <select
             value={selectedUnits.power}
             onChange={(e) => handleUnitChange("power", e.target.value)}
-            disabled={!connected || loading}
+            disabled={isDisabled}
           >
             {unitConversions.power.map((unit) => (
               <option key={unit.label} value={unit.label}>
@@ -339,10 +341,7 @@ const MonitoringPanel: React.FC = () => {
             ))}
           </select>
         </div>
-        <button
-          onClick={() => fetchMetric("power")}
-          disabled={!connected || loading}
-        >
+        <button onClick={() => fetchMetric("power")} disabled={isDisabled}>
           Refresh
         </button>
       </div>
@@ -359,7 +358,7 @@ const MonitoringPanel: React.FC = () => {
           <select
             value={selectedUnits.period}
             onChange={(e) => handleUnitChange("period", e.target.value)}
-            disabled={!connected || loading}
+            disabled={isDisabled}
           >
             {unitConversions.period.map((unit) => (
               <option key={unit.label} value={unit.label}>
@@ -368,10 +367,7 @@ const MonitoringPanel: React.FC = () => {
             ))}
           </select>
         </div>
-        <button
-          onClick={() => fetchMetric("period")}
-          disabled={!connected || loading}
-        >
+        <button onClick={() => fetchMetric("period")} disabled={isDisabled}>
           Refresh
         </button>
       </div>
@@ -393,22 +389,30 @@ const MonitoringPanel: React.FC = () => {
         {data.resonance_status && (
           <small>Status: {data.resonance_status}</small>
         )}
-        <button
-          onClick={() => fetchMetric("resonance")}
-          disabled={!connected || loading}
-        >
+        <button onClick={() => fetchMetric("resonance")} disabled={isDisabled}>
           Refresh
         </button>
       </div>
 
       <div className="buttons">
-        <button onClick={fetchAllMetrics} disabled={!connected || loading}>
+        <button onClick={fetchAllMetrics} disabled={isDisabled}>
           🔄 Refresh All
+        </button>
+        <button
+          onClick={() => setShowResonanceModal(true)}
+          disabled={isDisabled}
+        >
+          📊 Measure Resonance
         </button>
       </div>
 
       {!connected && <p className="warning">⚠️ Connect to a device first</p>}
       {message && <p className="message">{message}</p>}
+
+      {/* Add Modal */}
+      {showResonanceModal && (
+        <ResonanceModal onClose={() => setShowResonanceModal(false)} />
+      )}
     </div>
   );
 };

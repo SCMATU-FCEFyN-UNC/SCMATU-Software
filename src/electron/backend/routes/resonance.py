@@ -85,16 +85,13 @@ def start_resonance_measurement_endpoint():
     """Trigger resonance frequency measurement asynchronously."""
     if current_measurement["running"]:
         return jsonify({"success": False, "error": "Measurement already in progress"}), 409
-    
+        
     try:
-        current_measurement["running"] = True
-        # Call the service-level function instead of direct manager.write
-        result = start_resonance_measurement(slave = 20)
+        result = start_resonance_measurement(slave=20)
         return jsonify(result), 200
-
     except Exception as e:
-        current_measurement["running"] = False
         return jsonify({"success": False, "error": str(e)}), 500
+ 
     
 @resonance_bp.route("/status", methods=["GET"])
 def get_resonance_status_endpoint():

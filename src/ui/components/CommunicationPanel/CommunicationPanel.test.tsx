@@ -8,293 +8,458 @@ import {
 import CommunicationPanel from "./CommunicationPanel";
 import { vi, type Mock } from "vitest";
 import { useBackendRequest } from "../../utils/backendRequests";
-import { ConnectionStatusProvider } from "../../context/ConnectionStatusProvider";
+import { useConnection } from "../../context/ConnectionStatusProvider";
+import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 
 vi.mock("../../utils/backendRequests");
+vi.mock("../../context/ConnectionStatusProvider");
+vi.mock("../../context/ResonanceStatusProvider");
 
-// Helper wrapper to provide context
-const renderWithConnection = (ui: React.ReactElement) => {
-  return render(<ConnectionStatusProvider>{ui}</ConnectionStatusProvider>);
-};
+const mockUseConnection = useConnection as Mock;
+const mockUseResonanceStatus = useResonanceStatus as Mock;
+const mockMakeRequest = vi.fn();
 
 describe("CommunicationPanel", () => {
-  const mockMakeRequest = vi.fn();
   beforeEach(() => {
     vi.clearAllMocks();
     mockMakeRequest.mockReset();
-  });
-
-  it("renders without crashing", async () => {
     (useBackendRequest as Mock).mockReturnValue({
       makeRequest: mockMakeRequest,
       loading: false,
       error: null,
     });
 
-    await act(async () => {
-      renderWithConnection(<CommunicationPanel />);
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: vi.fn(),
+      selectedPort: "",
+      setSelectedPort: vi.fn(),
     });
 
-    expect(screen.getByText(/Communication Setup/i)).toBeInTheDocument();
+    mockUseResonanceStatus.mockReturnValue({
+      running: false,
+      setRunning: vi.fn(),
+    });
   });
 
-  it("fetches and displays available ports", async () => {
-    mockMakeRequest.mockResolvedValue({
-      data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
+  it("renders communication panel with default values", () => {
+    render(<CommunicationPanel />);
+
+    expect(screen.getByText("Communication Setup")).toBeInTheDocument();
+    expect(screen.getByText("Check Available Ports")).toBeInTheDocument();
+    expect(screen.getByLabelText("Port:")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("9600")).toBeInTheDocument(); // baudrate
+
+    // For select elements, check that the option with value "N" is selected
+    const paritySelect = screen.getByLabelText(/Parity:/);
+    expect(paritySelect).toHaveValue("N");
+
+    expect(screen.getByDisplayValue("1")).toBeInTheDocument(); // stopbits
+    expect(screen.getByDisplayValue("8")).toBeInTheDocument(); // bytesize
+    expect(screen.getByText("Connect")).toBeInTheDocument();
+    expect(screen.getByText("🔌 Not connected")).toBeInTheDocument();
+  });
+
+  it("fetches available ports when button is clicked", async () => {
+    const mockPorts = [
+      { device: "COM1", description: "Serial Port 1" },
+      { device: "COM3", description: "USB Serial Port" },
+    ];
+
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { ports: mockPorts },
     });
 
-    (useBackendRequest as Mock).mockReturnValue({
-      makeRequest: mockMakeRequest,
-      loading: false,
-      error: null,
-    });
+    render(<CommunicationPanel />);
 
     await act(async () => {
-      renderWithConnection(<CommunicationPanel />);
+      fireEvent.click(screen.getByText("Check Available Ports"));
     });
-
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
 
     await waitFor(() => {
-      expect(screen.getByText(/COM3 - USB Serial Device/)).toBeInTheDocument();
+      expect(mockMakeRequest).toHaveBeenCalledWith("/ports", { method: "GET" });
     });
+
+    // Verify ports are populated in dropdown
+    expect(screen.getByText("COM1 - Serial Port 1")).toBeInTheDocument();
+    expect(screen.getByText("COM3 - USB Serial Port")).toBeInTheDocument();
   });
 
-  it("connects when Connect is clicked", async () => {
-    mockMakeRequest
-      // 1️⃣ First call: manual "Check Available Ports"
-      .mockResolvedValueOnce({
-        data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
-      })
-      // 2️⃣ Second call: re-fetch ports before connect (still available)
-      .mockResolvedValueOnce({
-        data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
-      })
-      // 3️⃣ Third call: connect endpoint
-      .mockResolvedValueOnce({ data: { success: true } });
+  it("handles port fetch errors", async () => {
+    // Mock console.error to suppress the error log in test output
+    const consoleErrorMock = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
-    (useBackendRequest as Mock).mockReturnValue({
-      makeRequest: mockMakeRequest,
-      loading: false,
-      error: null,
-    });
+    mockMakeRequest.mockRejectedValueOnce(new Error("Network error"));
+
+    render(<CommunicationPanel />);
 
     await act(async () => {
-      renderWithConnection(<CommunicationPanel />);
+      fireEvent.click(screen.getByText("Check Available Ports"));
     });
-
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
-
-    const portSelect = await screen.findByLabelText(/Port:/i);
-    fireEvent.change(portSelect, { target: { value: "COM3" } });
-
-    fireEvent.click(screen.getByRole("button", { name: /^Connect$/i }));
-
-    expect(
-      await screen.findByText(/Connected to COM3/i, { exact: false })
-    ).toBeInTheDocument();
-  });
-
-  it("shows error if selected port is no longer available before connecting", async () => {
-    mockMakeRequest
-      // 1️⃣ Manual fetch
-      .mockResolvedValueOnce({
-        data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
-      })
-      // 2️⃣ Re-fetch before connect → no ports now
-      .mockResolvedValueOnce({ data: { ports: [] } });
-
-    (useBackendRequest as Mock).mockReturnValue({
-      makeRequest: mockMakeRequest,
-      loading: false,
-      error: null,
-    });
-
-    renderWithConnection(<CommunicationPanel />);
-
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
-    const portSelect = await screen.findByLabelText(/Port:/i);
-    fireEvent.change(portSelect, { target: { value: "COM3" } });
-
-    fireEvent.click(screen.getByRole("button", { name: /^Connect$/i }));
-
-    expect(
-      await screen.findByText(/Selected port is no longer available/i)
-    ).toBeInTheDocument();
-    expect(portSelect).toHaveValue(""); // selection should be cleared
-  });
-
-  it("disables inputs while connected", async () => {
-    mockMakeRequest
-      // 1️⃣ Manual fetch
-      .mockResolvedValueOnce({
-        data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
-      })
-      // 2️⃣ Re-fetch before connect (still available)
-      .mockResolvedValueOnce({
-        data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
-      })
-      // 3️⃣ Connect success
-      .mockResolvedValueOnce({ data: { success: true } });
-
-    (useBackendRequest as Mock).mockReturnValue({
-      makeRequest: mockMakeRequest,
-      loading: false,
-      error: null,
-    });
-
-    renderWithConnection(<CommunicationPanel />);
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
-
-    const portSelect = await screen.findByLabelText(/Port:/i);
-    fireEvent.change(portSelect, { target: { value: "COM3" } });
-    fireEvent.click(screen.getByRole("button", { name: /^Connect$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Connected to COM3/i)).toBeInTheDocument();
-    });
-
-    // Inputs must be disabled
-    expect(portSelect).toBeDisabled();
-    expect(screen.getByLabelText(/Baudrate/i)).toBeDisabled();
-    expect(screen.getByLabelText(/Parity/i)).toBeDisabled();
-  });
-
-  it("auto-disconnects when ports no longer include selected port", async () => {
-    mockMakeRequest
-      // 1️⃣ First fetch (Check Available Ports)
-      .mockResolvedValueOnce({
-        data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
-      })
-      // 2️⃣ Re-fetch before connect (still available)
-      .mockResolvedValueOnce({
-        data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
-      })
-      // 3️⃣ Connect success
-      .mockResolvedValueOnce({ data: { success: true } })
-      // 4️⃣ Later polling → no ports now → should trigger auto-disconnect
-      .mockResolvedValueOnce({ data: { ports: [] } });
-
-    (useBackendRequest as Mock).mockReturnValue({
-      makeRequest: mockMakeRequest,
-      loading: false,
-      error: null,
-    });
-
-    renderWithConnection(<CommunicationPanel />);
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
-
-    const portSelect = await screen.findByLabelText(/Port:/i);
-    fireEvent.change(portSelect, { target: { value: "COM3" } });
-    fireEvent.click(screen.getByRole("button", { name: /^Connect$/i }));
-
-    await waitFor(() =>
-      expect(screen.getByText(/Connected to COM3/i)).toBeInTheDocument()
-    );
-
-    // Trigger fetch ports again (simulate user manually refreshing)
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Connection lost: port is no longer available/i)
+        screen.getByText(
+          "⚠️ Failed to fetch available ports. Please try again."
+        )
+      ).toBeInTheDocument();
+    });
+
+    // Restore console.error
+    consoleErrorMock.mockRestore();
+  });
+
+  it("connects to selected port with correct parameters", async () => {
+    const mockSetConnected = vi.fn();
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: mockSetConnected,
+      selectedPort: "COM3",
+      setSelectedPort: vi.fn(),
+    });
+
+    const mockPorts = [
+      { device: "COM1", description: "Serial Port 1" },
+      { device: "COM3", description: "USB Serial Port" },
+    ];
+
+    // Mock ports fetch
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { ports: mockPorts },
+    });
+
+    // Mock connect success
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { success: true },
+    });
+
+    render(<CommunicationPanel />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Connect"));
+    });
+
+    await waitFor(() => {
+      expect(mockMakeRequest).toHaveBeenCalledWith("/ports", { method: "GET" });
+    });
+
+    await waitFor(() => {
+      expect(mockMakeRequest).toHaveBeenCalledWith("/connect", {
+        method: "POST",
+        data: {
+          port: "COM3",
+          baudrate: 9600,
+          parity: "N",
+          stopbits: 1,
+          bytesize: 8,
+        },
+      });
+    });
+
+    expect(mockSetConnected).toHaveBeenCalledWith(true);
+  });
+
+  it("disconnects from port", async () => {
+    const mockSetConnected = vi.fn();
+    mockUseConnection.mockReturnValue({
+      connected: true,
+      setConnected: mockSetConnected,
+      selectedPort: "COM3",
+      setSelectedPort: vi.fn(),
+    });
+
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { success: true },
+    });
+
+    render(<CommunicationPanel />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Disconnect"));
+    });
+
+    await waitFor(() => {
+      expect(mockMakeRequest).toHaveBeenCalledWith("/disconnect", {
+        method: "POST",
+      });
+    });
+
+    expect(mockSetConnected).toHaveBeenCalledWith(false);
+  });
+
+  it("prevents connection when no port is selected", () => {
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: vi.fn(),
+      selectedPort: "",
+      setSelectedPort: vi.fn(),
+    });
+
+    render(<CommunicationPanel />);
+
+    const connectButton = screen.getByText("Connect");
+    expect(connectButton).toBeDisabled();
+  });
+
+  it("disables form elements when connected", () => {
+    mockUseConnection.mockReturnValue({
+      connected: true,
+      setConnected: vi.fn(),
+      selectedPort: "COM3",
+      setSelectedPort: vi.fn(),
+    });
+
+    render(<CommunicationPanel />);
+
+    expect(screen.getByLabelText("Port:")).toBeDisabled();
+    expect(screen.getByDisplayValue("9600")).toBeDisabled();
+
+    // Check parity select is disabled and has correct value
+    const paritySelect = screen.getByLabelText(/Parity:/);
+    expect(paritySelect).toBeDisabled();
+    expect(paritySelect).toHaveValue("N");
+
+    expect(screen.getByDisplayValue("1")).toBeDisabled();
+    expect(screen.getByDisplayValue("8")).toBeDisabled();
+  });
+
+  it("disables disconnect button when resonance is running", () => {
+    mockUseConnection.mockReturnValue({
+      connected: true,
+      setConnected: vi.fn(),
+      selectedPort: "COM3",
+      setSelectedPort: vi.fn(),
+    });
+
+    mockUseResonanceStatus.mockReturnValue({
+      running: true,
+      setRunning: vi.fn(),
+    });
+
+    render(<CommunicationPanel />);
+
+    const disconnectButton = screen.getByText("Disconnect");
+    expect(disconnectButton).toBeDisabled();
+  });
+
+  it("shows loading states during operations", async () => {
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: vi.fn(),
+      selectedPort: "COM3",
+      setSelectedPort: vi.fn(),
+    });
+
+    // Mock a request that never resolves to test loading state
+    mockMakeRequest.mockImplementation(() => new Promise(() => {}));
+
+    render(<CommunicationPanel />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Connect"));
+    });
+
+    expect(screen.getByText("Connecting...")).toBeInTheDocument();
+    expect(screen.getByText("Connecting...")).toBeDisabled();
+  });
+
+  it("handles connection failure", async () => {
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: vi.fn(),
+      selectedPort: "COM3",
+      setSelectedPort: vi.fn(),
+    });
+
+    const mockPorts = [{ device: "COM3", description: "USB Serial Port" }];
+
+    // Mock ports fetch
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { ports: mockPorts },
+    });
+
+    // Mock connect failure
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { success: false },
+    });
+
+    render(<CommunicationPanel />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Connect"));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("⚠️ Failed to connect to the selected port.")
       ).toBeInTheDocument();
     });
   });
 
-  it("disables connect button when no port is selected", async () => {
-    mockMakeRequest.mockResolvedValue({
-      data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
+  it("handles connection exception", async () => {
+    // Mock console.error to suppress the error log in test output
+    const consoleErrorMock = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: vi.fn(),
+      selectedPort: "COM3",
+      setSelectedPort: vi.fn(),
     });
 
-    (useBackendRequest as Mock).mockReturnValue({
-      makeRequest: mockMakeRequest,
-      loading: false,
-      error: null,
+    const mockPorts = [{ device: "COM3", description: "USB Serial Port" }];
+
+    // Mock ports fetch
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { ports: mockPorts },
     });
+
+    // Mock connect exception
+    mockMakeRequest.mockRejectedValueOnce(new Error("Connection failed"));
+
+    render(<CommunicationPanel />);
 
     await act(async () => {
-      renderWithConnection(<CommunicationPanel />);
+      fireEvent.click(screen.getByText("Connect"));
     });
 
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
-
-    // Wait for loading to finish and ports to be loaded
     await waitFor(() => {
-      expect(screen.getByText(/COM3 - USB Serial Device/)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "⚠️ Failed to connect. Please check the device and try again."
+        )
+      ).toBeInTheDocument();
     });
 
-    // Connect button should be disabled when no port is selected
-    const connectButton = screen.getByRole("button", { name: /^Connect$/i });
-    expect(connectButton).toBeDisabled();
+    // Restore console.error
+    consoleErrorMock.mockRestore();
   });
 
-  it("enables connect button when port is selected", async () => {
-    mockMakeRequest.mockResolvedValue({
-      data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
+  it("clears selected port if it disappears from available ports", async () => {
+    const mockSetSelectedPort = vi.fn();
+    const mockSetConnected = vi.fn();
+
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: mockSetConnected,
+      selectedPort: "COM2", // This port will not be in the fetched list
+      setSelectedPort: mockSetSelectedPort,
     });
 
-    (useBackendRequest as Mock).mockReturnValue({
-      makeRequest: mockMakeRequest,
-      loading: false,
-      error: null,
+    const mockPorts = [
+      { device: "COM1", description: "Serial Port 1" },
+      { device: "COM3", description: "USB Serial Port" },
+    ];
+
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { ports: mockPorts },
     });
+
+    render(<CommunicationPanel />);
 
     await act(async () => {
-      renderWithConnection(<CommunicationPanel />);
+      fireEvent.click(screen.getByText("Check Available Ports"));
     });
 
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
-
-    // Wait for loading to finish and ports to be loaded
     await waitFor(() => {
-      expect(screen.getByText(/COM3 - USB Serial Device/)).toBeInTheDocument();
+      expect(mockSetSelectedPort).toHaveBeenCalledWith("");
     });
-
-    const portSelect = await screen.findByLabelText(/Port:/i);
-    fireEvent.change(portSelect, { target: { value: "COM3" } });
-
-    // Connect button should be enabled when port is selected
-    const connectButton = screen.getByRole("button", { name: /^Connect$/i });
-    expect(connectButton).toBeEnabled();
   });
 
-  it("shows loading state during port fetch", async () => {
-    // Create a promise that we can resolve manually
-    let resolveRequest: (value: any) => void;
-    const pendingPromise = new Promise((resolve) => {
-      resolveRequest = resolve;
+  it("auto-disconnects when port disappears while connected", async () => {
+    const mockSetConnected = vi.fn();
+    const mockSetSelectedPort = vi.fn();
+
+    mockUseConnection.mockReturnValue({
+      connected: true,
+      setConnected: mockSetConnected,
+      selectedPort: "COM2", // This port will not be in the fetched list
+      setSelectedPort: mockSetSelectedPort,
     });
 
-    mockMakeRequest.mockReturnValue(pendingPromise);
+    const mockPorts = [
+      { device: "COM1", description: "Serial Port 1" },
+      { device: "COM3", description: "USB Serial Port" },
+    ];
 
-    (useBackendRequest as Mock).mockReturnValue({
-      makeRequest: mockMakeRequest,
-      loading: false,
-      error: null,
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { ports: mockPorts },
     });
+
+    render(<CommunicationPanel />);
 
     await act(async () => {
-      renderWithConnection(<CommunicationPanel />);
+      fireEvent.click(screen.getByText("Check Available Ports"));
     });
 
-    fireEvent.click(screen.getByText(/Check Available Ports/i));
-
-    // Should show loading state
     await waitFor(() => {
-      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      expect(mockSetConnected).toHaveBeenCalledWith(false);
+      expect(mockSetSelectedPort).toHaveBeenCalledWith("");
+      expect(
+        screen.getByText("⚠️ Connection lost: port is no longer available.")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows connected status when connected", () => {
+    mockUseConnection.mockReturnValue({
+      connected: true,
+      setConnected: vi.fn(),
+      selectedPort: "COM3",
+      setSelectedPort: vi.fn(),
     });
 
-    // Resolve the request
+    render(<CommunicationPanel />);
+
+    expect(screen.getByText("✅ Connected to COM3")).toBeInTheDocument();
+  });
+
+  it("allows changing communication parameters when not connected", () => {
+    render(<CommunicationPanel />);
+
+    const baudrateInput = screen.getByDisplayValue("9600");
+    const paritySelect = screen.getByLabelText(/Parity:/);
+    const stopbitsInput = screen.getByDisplayValue("1");
+    const bytesizeInput = screen.getByDisplayValue("8");
+
+    expect(baudrateInput).not.toBeDisabled();
+    expect(paritySelect).not.toBeDisabled();
+    expect(stopbitsInput).not.toBeDisabled();
+    expect(bytesizeInput).not.toBeDisabled();
+
+    // Test changing values
+    fireEvent.change(baudrateInput, { target: { value: "115200" } });
+    fireEvent.change(paritySelect, { target: { value: "E" } });
+    fireEvent.change(stopbitsInput, { target: { value: "2" } });
+    fireEvent.change(bytesizeInput, { target: { value: "7" } });
+
+    expect(screen.getByDisplayValue("115200")).toBeInTheDocument();
+    expect(paritySelect).toHaveValue("E");
+    expect(screen.getByDisplayValue("2")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("7")).toBeInTheDocument();
+  });
+
+  it("handles empty ports array gracefully", async () => {
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { ports: [] },
+    });
+
+    render(<CommunicationPanel />);
+
     await act(async () => {
-      resolveRequest!({
-        data: { ports: [{ device: "COM3", description: "USB Serial Device" }] },
-      });
+      fireEvent.click(screen.getByText("Check Available Ports"));
     });
 
-    // Should go back to normal state
     await waitFor(() => {
-      expect(screen.getByText("Check Available Ports")).toBeInTheDocument();
+      expect(screen.getByText("Select a Port")).toBeInTheDocument();
+      // Should only have the default option in the port select
+      const portSelect = screen.getByLabelText("Port:");
+      const portOptions = portSelect.querySelectorAll("option");
+      expect(portOptions).toHaveLength(1); // Only "Select a Port" option
     });
   });
 });

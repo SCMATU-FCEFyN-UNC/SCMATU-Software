@@ -4,6 +4,7 @@ import ControlPanel from "./components/ControlPanel/ControlPanel";
 import MonitoringPanel from "./components/MonitoringPanel/MonitoringPanel";
 import { BackendUrlProvider } from "./context/BackendUrlProvider";
 import { ConnectionStatusProvider } from "./context/ConnectionStatusProvider";
+import { ResonanceStatusProvider } from "./context/ResonanceStatusProvider";
 import "./app.scss";
 
 function App() {
@@ -11,9 +12,11 @@ function App() {
     <>
       <BackendUrlProvider>
         <ConnectionStatusProvider>
-          <CommunicationPanel />
-          <ControlPanel />
-          <MonitoringPanel />
+          <ResonanceStatusProvider>
+            <CommunicationPanel />
+            <ControlPanel />
+            <MonitoringPanel />
+          </ResonanceStatusProvider>
         </ConnectionStatusProvider>
       </BackendUrlProvider>
     </>

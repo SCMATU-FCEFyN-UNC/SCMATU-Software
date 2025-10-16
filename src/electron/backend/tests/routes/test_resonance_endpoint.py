@@ -66,7 +66,6 @@ class TestResonanceRoutes:
             assert response.status_code == 200
             assert response.json == {"success": True}
             mock_start.assert_called_once_with(slave=20)
-            assert current_measurement["running"] is True
 
     def test_start_resonance_measurement_already_running(self, client):
         current_measurement["running"] = True
@@ -76,6 +75,8 @@ class TestResonanceRoutes:
             "success": False, 
             "error": "Measurement already in progress"
         }
+        # Reset the state after test
+        current_measurement["running"] = False
 
     def test_get_resonance_status_success(self, client):
         with patch("backend.routes.resonance.get_resonance_status") as mock_status:

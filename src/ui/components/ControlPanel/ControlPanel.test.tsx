@@ -9,11 +9,14 @@ import ControlPanel from "./ControlPanel";
 import { vi, type Mock } from "vitest";
 import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
+import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 
 vi.mock("../../utils/backendRequests");
 vi.mock("../../context/ConnectionStatusProvider");
+vi.mock("../../context/ResonanceStatusProvider");
 
 const mockUseConnection = useConnection as Mock;
+const mockUseResonanceStatus = useResonanceStatus as Mock;
 const mockMakeRequest = vi.fn();
 
 describe("ControlPanel", () => {
@@ -24,6 +27,11 @@ describe("ControlPanel", () => {
       makeRequest: mockMakeRequest,
       loading: false,
       error: null,
+    });
+    // Set default resonance status
+    mockUseResonanceStatus.mockReturnValue({
+      running: false,
+      setRunning: vi.fn(),
     });
   });
 
@@ -404,6 +412,68 @@ describe("ControlPanel", () => {
       await waitFor(() => {
         expect(screen.getByText("✅ Frequency updated")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("when resonance measurement is running", () => {
+    beforeEach(() => {
+      mockUseConnection.mockReturnValue({
+        connected: true,
+        setConnected: vi.fn(),
+        selectedPort: "COM3",
+        setSelectedPort: vi.fn(),
+      });
+      mockUseResonanceStatus.mockReturnValue({
+        running: true,
+        setRunning: vi.fn(),
+      });
+    });
+
+    it("disables all inputs when resonance is running", async () => {
+      await act(async () => {
+        render(<ControlPanel />);
+      });
+
+      const frequencyInput = screen.getByDisplayValue("60000");
+      const powerInput = screen.getByDisplayValue("50");
+      const samplesInput = screen.getByDisplayValue("100");
+      const stepInput = screen.getByDisplayValue("10");
+
+      expect(frequencyInput).toBeDisabled();
+      expect(powerInput).toBeDisabled();
+      expect(samplesInput).toBeDisabled();
+      expect(stepInput).toBeDisabled();
+    });
+
+    it("disables all buttons when resonance is running", async () => {
+      await act(async () => {
+        render(<ControlPanel />);
+      });
+
+      const setButtons = screen.getAllByRole("button", { name: /set/i });
+      const getButton = screen.getByRole("button", { name: /get/i });
+
+      setButtons.forEach((button) => {
+        expect(button).toBeDisabled();
+      });
+      expect(getButton).toBeDisabled();
+    });
+
+    it("does not make API calls when buttons are clicked while resonance is running", async () => {
+      await act(async () => {
+        render(<ControlPanel />);
+      });
+
+      const setButtons = screen.getAllByRole("button", { name: /set/i });
+      const getButton = screen.getByRole("button", { name: /get/i });
+
+      setButtons.forEach((button) => {
+        fireEvent.click(button);
+      });
+      fireEvent.click(getButton);
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(mockMakeRequest).not.toHaveBeenCalled();
     });
   });
 });

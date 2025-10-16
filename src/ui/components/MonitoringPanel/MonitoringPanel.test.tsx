@@ -9,11 +9,14 @@ import MonitoringPanel from "./MonitoringPanel";
 import { vi, type Mock } from "vitest";
 import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
+import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 
 vi.mock("../../utils/backendRequests");
 vi.mock("../../context/ConnectionStatusProvider");
+vi.mock("../../context/ResonanceStatusProvider");
 
 const mockUseConnection = useConnection as Mock;
+const mockUseResonanceStatus = useResonanceStatus as Mock;
 const mockMakeRequest = vi.fn();
 
 describe("MonitoringPanel", () => {
@@ -32,6 +35,11 @@ describe("MonitoringPanel", () => {
       selectedPort: "",
       setSelectedPort: vi.fn(),
     });
+
+    mockUseResonanceStatus.mockReturnValue({
+      running: false,
+      setRunning: vi.fn(),
+    });
   });
 
   it("renders all monitoring fields correctly", async () => {
@@ -41,11 +49,11 @@ describe("MonitoringPanel", () => {
 
     expect(screen.getByText("Monitoring Panel")).toBeInTheDocument();
 
-    // Check that we have 7 input fields (phase has 2 inputs now)
+    // Check that we have 7 input fields
     const inputs = screen.getAllByRole("textbox");
     expect(inputs).toHaveLength(7);
 
-    // Check that we have 5 unit selectors (phase time, phase angle, current, power, period)
+    // Check that we have 5 unit selectors
     const selectors = screen.getAllByRole("combobox");
     expect(selectors).toHaveLength(5);
 
@@ -55,6 +63,7 @@ describe("MonitoringPanel", () => {
     });
 
     expect(screen.getByText("🔄 Refresh All")).toBeInTheDocument();
+    expect(screen.getByText("📊 Measure Resonance")).toBeInTheDocument();
   });
 
   it("fetches all metrics when Refresh All is clicked", async () => {
@@ -65,7 +74,6 @@ describe("MonitoringPanel", () => {
       power: 1146.6,
       period: 0.02,
       resonance: {
-        // Nested under "resonance" as the component expects
         resonance_frequency: 50000,
         status_text: "obtained successfully",
       },
@@ -99,7 +107,7 @@ describe("MonitoringPanel", () => {
     expect(screen.getByDisplayValue("5.2000")).toBeInTheDocument(); // current
     expect(screen.getByDisplayValue("1146.600")).toBeInTheDocument(); // power
     expect(screen.getByDisplayValue("0.020000")).toBeInTheDocument(); // period
-    // The resonance frequency shows as empty in the HTML output, so don't check for it
+    expect(screen.getByDisplayValue("50.000")).toBeInTheDocument(); // resonance frequency (FIXED: no commas)
     expect(
       screen.getByText("Status: obtained successfully")
     ).toBeInTheDocument();
@@ -166,7 +174,6 @@ describe("MonitoringPanel", () => {
       data: {
         success: true,
         resonance: {
-          // Nested under "resonance"
           resonance_frequency: 45000,
           status_text: "obtained successfully",
         },
@@ -189,8 +196,7 @@ describe("MonitoringPanel", () => {
       });
     });
 
-    // Based on HTML output, it shows "45.000" not "45,000"
-    expect(screen.getByDisplayValue("45.000")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("45.000")).toBeInTheDocument(); // FIXED: no commas
     expect(
       screen.getByText("Status: obtained successfully")
     ).toBeInTheDocument();
@@ -244,23 +250,46 @@ describe("MonitoringPanel", () => {
     });
   });
 
-  describe("when disconnected", () => {
-    beforeEach(() => {
+  describe("when disconnected or resonance is running", () => {
+    it("disables all buttons when disconnected", async () => {
       mockUseConnection.mockReturnValue({
         connected: false,
         setConnected: vi.fn(),
         selectedPort: "",
         setSelectedPort: vi.fn(),
       });
-    });
 
-    it("disables all buttons when disconnected", async () => {
       await act(async () => {
         render(<MonitoringPanel />);
       });
 
       const refreshAllButton = screen.getByText("🔄 Refresh All");
+      const measureResonanceButton = screen.getByText("📊 Measure Resonance");
+
       expect(refreshAllButton).toBeDisabled();
+      expect(measureResonanceButton).toBeDisabled();
+
+      const refreshButtons = screen.getAllByText("Refresh");
+      refreshButtons.forEach((button) => {
+        expect(button).toBeDisabled();
+      });
+    });
+
+    it("disables all buttons when resonance is running", async () => {
+      mockUseResonanceStatus.mockReturnValue({
+        running: true,
+        setRunning: vi.fn(),
+      });
+
+      await act(async () => {
+        render(<MonitoringPanel />);
+      });
+
+      const refreshAllButton = screen.getByText("🔄 Refresh All");
+      const measureResonanceButton = screen.getByText("📊 Measure Resonance");
+
+      expect(refreshAllButton).toBeDisabled();
+      expect(measureResonanceButton).toBeDisabled();
 
       const refreshButtons = screen.getAllByText("Refresh");
       refreshButtons.forEach((button) => {
@@ -269,6 +298,13 @@ describe("MonitoringPanel", () => {
     });
 
     it("shows warning message when disconnected", async () => {
+      mockUseConnection.mockReturnValue({
+        connected: false,
+        setConnected: vi.fn(),
+        selectedPort: "",
+        setSelectedPort: vi.fn(),
+      });
+
       await act(async () => {
         render(<MonitoringPanel />);
       });
@@ -279,6 +315,13 @@ describe("MonitoringPanel", () => {
     });
 
     it("does not make API calls when buttons are clicked while disconnected", async () => {
+      mockUseConnection.mockReturnValue({
+        connected: false,
+        setConnected: vi.fn(),
+        selectedPort: "",
+        setSelectedPort: vi.fn(),
+      });
+
       await act(async () => {
         render(<MonitoringPanel />);
       });
@@ -304,7 +347,6 @@ describe("MonitoringPanel", () => {
       power: 152.415,
       period: 0.000123,
       resonance: {
-        // Nested under "resonance"
         resonance_frequency: 1234567,
         status_text: "measured",
       },
@@ -332,10 +374,9 @@ describe("MonitoringPanel", () => {
       expect(screen.getByDisplayValue("1.2346")).toBeInTheDocument(); // current
       expect(screen.getByDisplayValue("152.415")).toBeInTheDocument(); // power
       expect(screen.getByDisplayValue("1.230e-4")).toBeInTheDocument(); // period
-      // The resonance frequency shows as empty in the HTML output, so don't check for it
+      expect(screen.getByDisplayValue("1.234.567")).toBeInTheDocument(); // FIXED: resonance frequency with dots
     });
 
-    // Just verify the status text is there
     expect(screen.getByText("Status: measured")).toBeInTheDocument();
   });
 
@@ -372,6 +413,10 @@ describe("MonitoringPanel", () => {
     refreshButtons.forEach((button) => {
       expect(button).toBeDisabled();
     });
+
+    // Check that Measure Resonance button is also disabled
+    const measureResonanceButton = screen.getByText("📊 Measure Resonance");
+    expect(measureResonanceButton).toBeDisabled();
   });
 
   it("shows phase relationships correctly", async () => {
@@ -381,8 +426,10 @@ describe("MonitoringPanel", () => {
       current: 5.2,
       power: 1146.6,
       period: 0.02,
-      resonance_frequency: 50000,
-      resonance_status: "obtained successfully",
+      resonance: {
+        resonance_frequency: 50000,
+        status_text: "obtained successfully",
+      },
     };
 
     mockMakeRequest.mockResolvedValueOnce({
@@ -454,8 +501,10 @@ describe("MonitoringPanel", () => {
       current: 1.5, // 1.5 A
       power: 330.75, // 330.75 VA
       period: 0.001, // 0.001 s
-      resonance_frequency: 50000,
-      resonance_status: "obtained successfully",
+      resonance: {
+        resonance_frequency: 50000,
+        status_text: "obtained successfully",
+      },
     };
 
     mockMakeRequest.mockResolvedValueOnce({
@@ -522,7 +571,8 @@ describe("MonitoringPanel", () => {
     });
   });
 
-  it("disables unit selectors when disconnected", async () => {
+  it("disables unit selectors when disconnected or resonance is running", async () => {
+    // Test when disconnected
     mockUseConnection.mockReturnValue({
       connected: false,
       setConnected: vi.fn(),
@@ -534,8 +584,29 @@ describe("MonitoringPanel", () => {
       render(<MonitoringPanel />);
     });
 
-    const selectors = screen.getAllByRole("combobox");
-    selectors.forEach((selector) => {
+    const selectorsWhenDisconnected = screen.getAllByRole("combobox");
+    selectorsWhenDisconnected.forEach((selector) => {
+      expect(selector).toBeDisabled();
+    });
+
+    // Test when resonance is running
+    mockUseConnection.mockReturnValue({
+      connected: true,
+      setConnected: vi.fn(),
+      selectedPort: "",
+      setSelectedPort: vi.fn(),
+    });
+    mockUseResonanceStatus.mockReturnValue({
+      running: true,
+      setRunning: vi.fn(),
+    });
+
+    await act(async () => {
+      render(<MonitoringPanel />);
+    });
+
+    const selectorsWhenRunning = screen.getAllByRole("combobox");
+    selectorsWhenRunning.forEach((selector) => {
       expect(selector).toBeDisabled();
     });
   });
@@ -557,5 +628,13 @@ describe("MonitoringPanel", () => {
     selectors.forEach((selector) => {
       expect(selector).toBeDisabled();
     });
+  });
+
+  it("renders Measure Resonance button", async () => {
+    await act(async () => {
+      render(<MonitoringPanel />);
+    });
+
+    expect(screen.getByText("📊 Measure Resonance")).toBeInTheDocument();
   });
 });
