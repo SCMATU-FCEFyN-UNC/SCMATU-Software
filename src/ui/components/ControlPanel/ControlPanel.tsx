@@ -7,8 +7,11 @@ import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 const ControlPanel: React.FC = () => {
   const [frequency, setFrequency] = useState<number>(60000);
   const [power, setPower] = useState<number>(50);
-  const [samples, setSamples] = useState<number>(100);
-  const [step, setStep] = useState<number>(10);
+
+  // New states for transducer and timings
+  const [transducerEnabled, setTransducerEnabled] = useState<boolean>(true); // initially enabled
+  const [onTime, setOnTime] = useState<number>(100);
+  const [offTime, setOffTime] = useState<number>(100);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -50,19 +53,38 @@ const ControlPanel: React.FC = () => {
     );
   }
 
-  async function handleSetSamples() {
-    await handleRequest(
-      "/samples",
-      { sample_count: samples },
-      "Sample count updated"
-    );
+  async function handleToggleTransducer() {
+    try {
+      setLoading(true);
+      setMessage(null);
+      const target = !transducerEnabled;
+      const response = await makeRequest("/transducer", {
+        method: "POST",
+        data: { enabled: target },
+      });
+      if (response.data.success) {
+        setTransducerEnabled(Boolean(response.data.enabled ?? target));
+        setMessage(`✅ Transducer ${target ? "enabled" : "disabled"}`);
+      } else {
+        setMessage(`❌ ${response.data.error || "Failed to set transducer"}`);
+      }
+    } catch (err) {
+      console.error("Request failed:", err);
+      setMessage("❌ Request failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function handleSetStep() {
+  async function handleSetOnTime() {
+    await handleRequest("/on_time", { on_time_ms: onTime }, "On time updated");
+  }
+
+  async function handleSetOffTime() {
     await handleRequest(
-      "/frequency-step",
-      { step_hz: step },
-      "Frequency step updated"
+      "/off_time",
+      { off_time_ms: offTime },
+      "Off time updated"
     );
   }
 
@@ -128,33 +150,50 @@ const ControlPanel: React.FC = () => {
         </button>
       </div>
 
+      {/* Transducer enable/disable toggle */}
       <div className="fieldGroup">
-        <label>Sample Count</label>
+        <label>Transducer</label>
+        <div
+          className="transducer-row"
+          style={{ display: "flex", alignItems: "center", gap: "8px" }}
+        >
+          <span>{transducerEnabled ? "Enabled" : "Disabled"}</span>
+          <button onClick={handleToggleTransducer} disabled={isDisabled}>
+            {transducerEnabled ? "Disable" : "Enable"}
+          </button>
+        </div>
+      </div>
+
+      {/* On time (ms) */}
+      <div className="fieldGroup">
+        <label>On Time (ms)</label>
         <input
           type="number"
-          value={samples}
-          min={1}
+          value={onTime}
+          min={0}
           disabled={isDisabled}
-          onChange={(e) => setSamples(Number(e.target.value))}
+          onChange={(e) => setOnTime(Number(e.target.value))}
         />
-        <button onClick={handleSetSamples} disabled={isDisabled}>
+        <button onClick={handleSetOnTime} disabled={isDisabled}>
           Set
         </button>
       </div>
 
+      {/* Off time (ms) */}
       <div className="fieldGroup">
-        <label>Frequency Step (Hz)</label>
+        <label>Off Time (ms)</label>
         <input
           type="number"
-          value={step}
-          min={1}
+          value={offTime}
+          min={0}
           disabled={isDisabled}
-          onChange={(e) => setStep(Number(e.target.value))}
+          onChange={(e) => setOffTime(Number(e.target.value))}
         />
-        <button onClick={handleSetStep} disabled={isDisabled}>
+        <button onClick={handleSetOffTime} disabled={isDisabled}>
           Set
         </button>
       </div>
+
       {!connected && <p className="warning">⚠️ Connect to a device first</p>}
       {message && <p className="message">{message}</p>}
     </div>

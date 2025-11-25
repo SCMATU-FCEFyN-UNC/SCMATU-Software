@@ -41,3 +41,59 @@ def set_sample_count(sample_count: int):
         raise ValueError("Sample count must be positive")
     manager.write("holding", 20, 5, sample_count)
     return {"success": True, "samples": sample_count}
+
+def set_transducer(enabled: bool):
+    """
+    Enable or disable the transducer using coil 0.
+    enabled=True  -> write 1 to coil 0
+    enabled=False -> write 0 to coil 0
+    """
+    val = 1 if enabled else 0
+    manager.write("coil", 20, 0, val)
+    return {"success": True, "enabled": bool(enabled)}
+
+def get_transducer() -> bool:
+    """
+    Read the transducer enabled state from coil 0.
+    Returns True if enabled, False if disabled.
+    """
+    state = manager.read("coil", 20, 0)
+    if state is None:
+        raise ValueError("Failed to read transducer coil state")
+    return bool(state)
+
+def set_on_time(on_time_ms: int):
+    """
+    Set the transducer on time (ms) in holding register 5.
+    """
+    if on_time_ms < 0:
+        raise ValueError("On time must be non-negative")
+    manager.write("holding", 20, 5, on_time_ms)
+    return {"success": True, "on_time": on_time_ms}
+
+def get_on_time() -> int:
+    """
+    Read the transducer on time (ms) from holding register 5.
+    """
+    val = manager.read("holding", 20, 5)
+    if val is None:
+        raise ValueError("Failed to read on_time register")
+    return val
+
+def set_off_time(off_time_ms: int):
+    """
+    Set the transducer off time (ms) in holding register 6.
+    """
+    if off_time_ms < 0:
+        raise ValueError("Off time must be non-negative")
+    manager.write("holding", 20, 6, off_time_ms)
+    return {"success": True, "off_time": off_time_ms}
+
+def get_off_time() -> int:
+    """
+    Read the transducer off time (ms) from holding register 6.
+    """
+    val = manager.read("holding", 20, 6)
+    if val is None:
+        raise ValueError("Failed to read off_time register")
+    return val

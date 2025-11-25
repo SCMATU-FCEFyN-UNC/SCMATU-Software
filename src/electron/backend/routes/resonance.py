@@ -84,10 +84,13 @@ def write_frequency_step():
 def start_resonance_measurement_endpoint():
     """Trigger resonance frequency measurement asynchronously."""
     if current_measurement["running"]:
+        print("Measurement already in progress.", flush=True)
         return jsonify({"success": False, "error": "Measurement already in progress"}), 409
         
     try:
+        print("Starting resonance measurement...", flush=True)
         result = start_resonance_measurement(slave=20)
+        print(f"Resonance measurement initiated, result = {result}", flush=True)
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

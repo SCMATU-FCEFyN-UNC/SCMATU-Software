@@ -54,12 +54,28 @@ def get_voltage(slave: int = 20) -> float:
     global _last_voltage
 
     manager.write("coil", 20, 2, 1)
-    
+
+    # Wait until voltage measurement ready (input register 6 == 1)
+    time.sleep(0.2)
+    ready = manager.read("input", slave, 6)
+    max_attempts = 50
+    attempts = 0
+    while ready != 1 and attempts < max_attempts:
+        time.sleep(0.1)
+        ready = manager.read("input", slave, 6)
+        attempts += 1
+
+    if attempts >= max_attempts:
+        raise ValueError("Voltage measurement timeout - device not ready")
+
+    if ready is None:
+        raise ValueError("Failed to read voltage ready register")
+
     voltage_adc = manager.read("input", slave, 4)   # ADC steps
     if voltage_adc is None:
         raise ValueError("Failed to read voltage ADC register")
 
-    v_gain = manager.read("holding", slave, 12)      # calibration gain
+    v_gain = manager.read("holding", slave, 14)      # calibration gain
     if v_gain is None or v_gain == 0:
         raise ValueError("Invalid voltage gain read")
 
@@ -76,15 +92,31 @@ def get_current(slave: int = 20) -> float:
 
     manager.write("coil", 20, 2, 1)
 
+    # Wait until current measurement ready (input register 7 == 1)
+    time.sleep(0.2)
+    ready = manager.read("input", slave, 7)
+    max_attempts = 50
+    attempts = 0
+    while ready != 1 and attempts < max_attempts:
+        time.sleep(0.1)
+        ready = manager.read("input", slave, 7)
+        attempts += 1
+
+    if attempts >= max_attempts:
+        raise ValueError("Current measurement timeout - device not ready")
+
+    if ready is None:
+        raise ValueError("Failed to read current ready register")
+
     current_adc = manager.read("input", slave, 5)   # ADC steps
     if current_adc is None:
         raise ValueError("Failed to read current ADC register")
 
-    c_gain = manager.read("holding", slave, 13)      # calibration gain
+    c_gain = manager.read("holding", slave, 15)      # calibration gain
     if c_gain is None or c_gain == 0:
         raise ValueError("Invalid current gain read")
 
-    r_shunt = manager.read("holding", slave, 14)  # shunt resistor value
+    r_shunt = manager.read("holding", slave, 16)  # shunt resistor value
     if r_shunt is None or r_shunt == 0:
         raise ValueError("Invalid shunt resistor value read")
     
@@ -118,8 +150,15 @@ def get_period(slave: int = 20) -> float:
 
 def get_resonance_frequency(slave: int = 20):
     """
-    Reads the resonance frequency status and (if available) its value.
-    Uses three registers: hi (6), lo (7), status (8).
+    Reads the resonance frequency measurements with their associated metrics.
+    
+    Returns three frequency measurements:
+    1. Best Overall Frequency (registers 10-13)
+       - hi: 10, lo: 11, phase: 12, current: 13
+    2. Best Phase Frequency (registers 14-17)
+       - hi: 14, lo: 15, phase: 16, current: 17
+    3. Best Current Frequency (registers 18-21)
+       - hi: 18, lo: 19, phase: 20, current: 21
 
     Status codes:
         0 -> "not obtained"
@@ -127,8 +166,8 @@ def get_resonance_frequency(slave: int = 20):
         2 -> "failed to obtain"
         3 -> "measurement in progress"
     """
-    # Read only the status register first
-    status = manager.read("input", slave, 8)
+    # Read the status register first
+    status = manager.read("input", slave, 9)
 
     if status is None:
         raise ValueError("Failed to read resonance frequency status register")
@@ -141,20 +180,60 @@ def get_resonance_frequency(slave: int = 20):
     }
     status_text = status_texts.get(status, f"unknown ({status})")
 
-    # Only read hi/lo if measurement succeeded
-    if status == 1:
-        hi = manager.read("input", slave, 6)
-        lo = manager.read("input", slave, 7)
-
-        if hi is None or lo is None:
-            raise ValueError("Failed to read resonance frequency registers")
-
-        freq = (hi << 16) | lo
-    else:
-        freq = -1  # indicate not obtained or failed
-
-    return {
-        "resonance_frequency": freq,
+    # Initialize result structure
+    result = {
         "status_code": status,
         "status_text": status_text,
+        "best_overall": None,
+        "best_phase": None,
+        "best_current": None,
     }
+
+    # Only read frequency data if measurement succeeded
+    if status == 1:
+        # Best Overall Frequency
+        best_overall_hi = manager.read("input", slave, 10)
+        best_overall_lo = manager.read("input", slave, 11)
+        best_overall_phase = manager.read("input", slave, 12)
+        best_overall_current = manager.read("input", slave, 13)
+
+        if any(val is None for val in [best_overall_hi, best_overall_lo, best_overall_phase, best_overall_current]):
+            raise ValueError("Failed to read best overall frequency registers")
+
+        result["best_overall"] = {
+            "frequency": (best_overall_hi << 16) | best_overall_lo,
+            "phase": best_overall_phase,
+            "current": best_overall_current,
+        }
+
+        # Best Phase Frequency
+        best_phase_hi = manager.read("input", slave, 14)
+        best_phase_lo = manager.read("input", slave, 15)
+        best_phase_phase = manager.read("input", slave, 16)
+        best_phase_current = manager.read("input", slave, 17)
+
+        if any(val is None for val in [best_phase_hi, best_phase_lo, best_phase_phase, best_phase_current]):
+            raise ValueError("Failed to read best phase frequency registers")
+
+        result["best_phase"] = {
+            "frequency": (best_phase_hi << 16) | best_phase_lo,
+            "phase": best_phase_phase,
+            "current": best_phase_current,
+        }
+
+        # Best Current Frequency
+        best_current_hi = manager.read("input", slave, 18)
+        best_current_lo = manager.read("input", slave, 19)
+        best_current_phase = manager.read("input", slave, 20)
+        best_current_current = manager.read("input", slave, 21)
+
+        if any(val is None for val in [best_current_hi, best_current_lo, best_current_phase, best_current_current]):
+            raise ValueError("Failed to read best current frequency registers")
+
+        result["best_current"] = {
+            "frequency": (best_current_hi << 16) | best_current_lo,
+            "phase": best_current_phase,
+            "current": best_current_current,
+        }
+
+    return result

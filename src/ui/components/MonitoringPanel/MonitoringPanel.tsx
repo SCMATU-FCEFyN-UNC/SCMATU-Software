@@ -10,21 +10,34 @@ interface PhaseData {
   degrees: number;
 }
 
+interface FrequencyMetrics {
+  frequency: number;
+  phase: number;
+  current: number;
+}
+
+interface ResonanceData {
+  status_code: number;
+  status_text: string;
+  best_overall: FrequencyMetrics | null;
+  best_phase: FrequencyMetrics | null;
+  best_current: FrequencyMetrics | null;
+}
+
 interface MonitoringData {
   phase: PhaseData | null;
   voltage: number | null;
   current: number | null;
   power: number | null;
   period: number | null;
-  resonance_frequency: number | null;
-  resonance_status: string | null;
+  resonance: ResonanceData | null;
 }
 
 type UnitType = "phase" | "current" | "power" | "period";
 
 interface UnitConfig {
   label: string;
-  convert: (seconds: number) => number; // Always from seconds
+  convert: (seconds: number) => number;
 }
 
 const unitConversions: Record<UnitType, UnitConfig[]> = {
@@ -60,8 +73,7 @@ const MonitoringPanel: React.FC = () => {
     current: null,
     power: null,
     period: null,
-    resonance_frequency: null,
-    resonance_status: null,
+    resonance: null,
   });
 
   const [loading, setLoading] = useState(false);
@@ -74,16 +86,13 @@ const MonitoringPanel: React.FC = () => {
     period: "s",
   });
 
-  // phase angle unit (° or rad)
   const [phaseAngleUnit, setPhaseAngleUnit] = useState<"deg" | "rad">("deg");
 
   const { makeRequest } = useBackendRequest();
   const { connected } = useConnection();
 
-  // Add state for modal
   const [showResonanceModal, setShowResonanceModal] = useState(false);
 
-  // Helper: phase sign meaning
   const getPhaseRelationship = (phase: PhaseData | null): string => {
     if (!phase) return "";
     const value = phase.seconds;
@@ -92,25 +101,22 @@ const MonitoringPanel: React.FC = () => {
     return "(voltage leads current)";
   };
 
-  // Helper: format phase time value
   const formatPhaseTime = (phase: PhaseData | null, unit: string): string => {
     if (!phase) return "";
     const converter = unitConversions.phase.find((u) => u.label === unit);
     if (!converter) return "";
-    const value = converter.convert(Math.abs(phase.seconds)); // ← absolute value (no sign)
-    // Keep full precision, trim unnecessary zeros
+    const value = converter.convert(Math.abs(phase.seconds));
     return value.toPrecision(6).replace(/\.?0+$/, "");
   };
 
-  // format phase angle (degrees ↔ radians) now keeps the sign
   const formatPhaseAngle = (phase: PhaseData | null): string => {
     if (!phase) return "";
-    const deg = phase.degrees; // signed value
+    const deg = phase.degrees;
 
     if (phaseAngleUnit === "deg") {
       return deg.toFixed(2) + "°";
     } else {
-      const radRatio = deg / 180; // π rad = 180°
+      const radRatio = deg / 180;
       const formatted = radRatio.toFixed(3).replace(/\.?0+$/, "");
       return `${formatted}π`;
     }
@@ -120,7 +126,6 @@ const MonitoringPanel: React.FC = () => {
     setSelectedUnits((prev) => ({ ...prev, [type]: newUnit }));
   };
 
-  // 🟢 Added: handle phase angle unit change
   const handleAngleUnitChange = (newUnit: "deg" | "rad") => {
     setPhaseAngleUnit(newUnit);
   };
@@ -155,8 +160,7 @@ const MonitoringPanel: React.FC = () => {
           current: d.current,
           power: d.power,
           period: d.period,
-          resonance_frequency: d.resonance?.resonance_frequency ?? null,
-          resonance_status: d.resonance?.status_text ?? null,
+          resonance: d.resonance,
         });
         setMessage("✅ Monitoring data updated");
       } else {
@@ -170,7 +174,7 @@ const MonitoringPanel: React.FC = () => {
     }
   }
 
-  async function fetchMetric(metric: keyof MonitoringData | "resonance") {
+  async function fetchMetric(metric: keyof MonitoringData) {
     try {
       setLoading(true);
       setMessage(null);
@@ -184,11 +188,9 @@ const MonitoringPanel: React.FC = () => {
       }
 
       if (metric === "resonance") {
-        const r = response.data.resonance;
         setData((prev) => ({
           ...prev,
-          resonance_frequency: r.resonance_frequency,
-          resonance_status: r.status_text,
+          resonance: response.data.resonance,
         }));
         setMessage("✅ Resonance frequency updated");
       } else if (metric === "period") {
@@ -213,11 +215,59 @@ const MonitoringPanel: React.FC = () => {
     }
   }
 
-  // Get running state from context
   const { running } = useResonanceStatus();
-
-  // Helper to check if interactions should be disabled
   const isDisabled = !connected || loading || running;
+
+  const renderFrequencyRow = (
+    label: string,
+    metrics: FrequencyMetrics | null
+  ) => {
+    if (!metrics) {
+      return (
+        <div className="frequency-row" key={label}>
+          <div className="frequency-cell frequency-label">
+            <label>{label}</label>
+          </div>
+          <div className="frequency-cell">
+            <label>Frequency (Hz)</label>
+            <input type="text" value="-" readOnly />
+          </div>
+          <div className="frequency-cell">
+            <label>Phase</label>
+            <input type="text" value="-" readOnly />
+          </div>
+          <div className="frequency-cell">
+            <label>Current</label>
+            <input type="text" value="-" readOnly />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="frequency-row" key={label}>
+        <div className="frequency-cell frequency-label">
+          <label>{label}</label>
+        </div>
+        <div className="frequency-cell">
+          <label>Frequency (Hz)</label>
+          <input
+            type="text"
+            value={metrics.frequency.toLocaleString()}
+            readOnly
+          />
+        </div>
+        <div className="frequency-cell">
+          <label>Phase</label>
+          <input type="text" value={metrics.phase.toString()} readOnly />
+        </div>
+        <div className="frequency-cell">
+          <label>Current</label>
+          <input type="text" value={metrics.current.toString()} readOnly />
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="panel">
@@ -254,7 +304,6 @@ const MonitoringPanel: React.FC = () => {
                 value={formatPhaseAngle(data.phase)}
                 readOnly
               />
-              {/* 🟢 Changed: selectable degrees/radians */}
               <select
                 value={phaseAngleUnit}
                 onChange={(e) =>
@@ -372,23 +421,21 @@ const MonitoringPanel: React.FC = () => {
         </button>
       </div>
 
-      {/* RESONANCE */}
+      {/* RESONANCE - THREE FREQUENCIES - ALWAYS SHOW GRID */}
       <div className="monitoring-fieldGroup">
-        <label>Resonance Frequency (Hz)</label>
-        <div className="no-unit-input">
-          <input
-            type="text"
-            value={
-              data.resonance_frequency !== null
-                ? data.resonance_frequency.toLocaleString()
-                : ""
-            }
-            readOnly
-          />
+        <label>Resonance Frequency</label>
+        {data.resonance && <small>Status: {data.resonance.status_text}</small>}
+        <div className="frequency-grid">
+          {renderFrequencyRow(
+            "Best Overall",
+            data.resonance?.best_overall ?? null
+          )}
+          {renderFrequencyRow("Best Phase", data.resonance?.best_phase ?? null)}
+          {renderFrequencyRow(
+            "Best Current",
+            data.resonance?.best_current ?? null
+          )}
         </div>
-        {data.resonance_status && (
-          <small>Status: {data.resonance_status}</small>
-        )}
         <button onClick={() => fetchMetric("resonance")} disabled={isDisabled}>
           Refresh
         </button>
@@ -409,7 +456,6 @@ const MonitoringPanel: React.FC = () => {
       {!connected && <p className="warning">⚠️ Connect to a device first</p>}
       {message && <p className="message">{message}</p>}
 
-      {/* Add Modal */}
       {showResonanceModal && (
         <ResonanceModal onClose={() => setShowResonanceModal(false)} />
       )}

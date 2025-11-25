@@ -11,13 +11,14 @@ monitoring_bp = Blueprint("monitoring", __name__)
 def get_all_monitoring():
     """Return all monitoring values in one call."""
     try:
+        resonance_data = get_resonance_frequency()
         data = {
             "phase": get_phase(),
             "voltage": get_voltage(),
             "current": get_current(),
             "power": get_power(),
             "period": get_period(),
-            "resonance": get_resonance_frequency(),
+            "resonance": resonance_data,
         }
         return jsonify({"success": True, "data": data}), 200
     except Exception as e:
