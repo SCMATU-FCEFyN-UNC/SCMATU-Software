@@ -42,19 +42,6 @@ def set_power_level_endpoint():
         return jsonify({"success": False, "error": str(e)}), 400
 
 
-@control_bp.route("/samples", methods=["POST"])
-def set_sample_count_endpoint():
-    """Set number of samples used for phase measurement."""
-    data = request.get_json() or {}
-    count = int(data.get("sample_count", 0))
-
-    try:
-        result = control_service.set_sample_count(count)
-        return jsonify(result), 200
-    except ValueError as e:
-        return jsonify({"success": False, "error": str(e)}), 400
-
-
 @control_bp.route("/transducer", methods=["POST"])
 def set_transducer_endpoint():
     """Enable or disable the transducer (coil 0)."""

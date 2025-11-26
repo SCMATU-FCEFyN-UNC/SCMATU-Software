@@ -110,7 +110,7 @@ class TestMonitoringService:
     def test_get_voltage_success(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [2048, 10000]  # voltage_adc, v_gain
+            mock_read.side_effect = [1, 2048, 10000]  # ready, voltage_adc, v_gain
             result = monitoring_service.get_voltage(20)
             
             # Verify calculations
@@ -123,29 +123,29 @@ class TestMonitoringService:
     def test_get_voltage_adc_read_failure(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [None, 10000]  # voltage_adc fails
+            mock_read.side_effect = [1, None, 10000]  # ready passes, voltage_adc fails
             with pytest.raises(ValueError, match="Failed to read voltage ADC register"):
                 monitoring_service.get_voltage(20)
 
     def test_get_voltage_gain_read_failure(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [2048, None]  # v_gain fails
+            mock_read.side_effect = [1, 2048, None]  # ready passes, v_gain fails
             with pytest.raises(ValueError, match="Invalid voltage gain read"):
                 monitoring_service.get_voltage(20)
 
     def test_get_voltage_zero_gain(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [2048, 0]  # v_gain is zero
+            mock_read.side_effect = [1, 2048, 0]  # ready passes, v_gain is zero
             with pytest.raises(ValueError, match="Invalid voltage gain read"):
                 monitoring_service.get_voltage(20)
 
     def test_get_current_success(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            # current_adc, c_gain, r_shunt
-            mock_read.side_effect = [2048, 500, 1010]  
+            # ready, current_adc, c_gain, r_shunt
+            mock_read.side_effect = [1, 2048, 500, 1010]  
             result = monitoring_service.get_current(20)
             
             # Verify calculations
@@ -160,35 +160,35 @@ class TestMonitoringService:
     def test_get_current_adc_read_failure(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [None, 500, 1010]  # current_adc fails
+            mock_read.side_effect = [1, None, 500, 1010]  # ready passes, current_adc fails
             with pytest.raises(ValueError, match="Failed to read current ADC register"):
                 monitoring_service.get_current(20)
 
     def test_get_current_gain_read_failure(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [2048, None, 1010]  # c_gain fails
+            mock_read.side_effect = [1, 2048, None, 1010]  # ready passes, c_gain fails
             with pytest.raises(ValueError, match="Invalid current gain read"):
                 monitoring_service.get_current(20)
 
     def test_get_current_zero_gain(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [2048, 0, 1010]  # c_gain is zero
+            mock_read.side_effect = [1, 2048, 0, 1010]  # ready passes, c_gain is zero
             with pytest.raises(ValueError, match="Invalid current gain read"):
                 monitoring_service.get_current(20)
 
     def test_get_current_shunt_read_failure(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [2048, 500, None]  # r_shunt fails
+            mock_read.side_effect = [1, 2048, 500, None]  # ready passes, r_shunt fails
             with pytest.raises(ValueError, match="Invalid shunt resistor value read"):
                 monitoring_service.get_current(20)
 
     def test_get_current_zero_shunt(self):
         with patch("backend.services.monitoring_service.manager.write") as mock_write, \
              patch("backend.services.monitoring_service.manager.read") as mock_read:
-            mock_read.side_effect = [2048, 500, 0]  # r_shunt is zero
+            mock_read.side_effect = [1, 2048, 500, 0]  # ready passes, r_shunt is zero
             with pytest.raises(ValueError, match="Invalid shunt resistor value read"):
                 monitoring_service.get_current(20)
 
@@ -248,51 +248,85 @@ class TestMonitoringService:
                 monitoring_service.get_period(20)
 
     def test_get_resonance_frequency_success(self):
-        with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-             patch("backend.services.monitoring_service.manager.read") as mock_read:
-            # First read status, then if status==1, read hi/lo
-            mock_read.side_effect = [1, 0x0001, 0x86A0]  # status=1, then hi, then lo
+        with patch("backend.services.monitoring_service.manager.read") as mock_read:
+            # Mock status and all frequency data reads
+            mock_read.side_effect = [
+                1,  # status
+                # Best Overall
+                0x0001, 0x86A0, 4500, 2048,
+                # Best Phase  
+                0x0001, 0x86A1, 1000, 1500,
+                # Best Current
+                0x0001, 0x86A2, 2000, 3000
+            ]
             result = monitoring_service.get_resonance_frequency(20)
             
-            assert result == {
-                "resonance_frequency": 100000,  # 0x186A0 in decimal
-                "status_code": 1,
-                "status_text": "obtained successfully"
-            }
+            assert result["status_code"] == 1
+            assert result["status_text"] == "obtained successfully"
+            assert result["best_overall"]["frequency"] == 100000  # 0x186A0
+            assert result["best_overall"]["phase"] == 4500
+            assert result["best_overall"]["current"] == 2048
+            assert result["best_phase"]["frequency"] == 100001  # 0x186A1
+            assert result["best_current"]["frequency"] == 100002  # 0x186A2
 
-    def test_get_resonance_frequency_different_status_codes(self):
-        status_test_cases = [
-            (0, "not obtained"),
-            (2, "failed to obtain"),
-            (3, "measurement in progress"),  # Changed to match new status text
-            (4, "unknown (4)")  # Test unknown status with a number not in the mapping
-        ]
-        
-        for status_code, expected_text in status_test_cases:
-            with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-                 patch("backend.services.monitoring_service.manager.read") as mock_read:
-                mock_read.return_value = status_code  # Only status will be read
-                result = monitoring_service.get_resonance_frequency(20)
-                
-                assert result == {
-                    "resonance_frequency": -1,  # Invalid/not obtained
-                    "status_code": status_code,
-                    "status_text": expected_text
-                }
+    def test_get_resonance_frequency_status_0(self):
+        with patch("backend.services.monitoring_service.manager.read") as mock_read:
+            mock_read.return_value = 0  # status = not obtained
+            result = monitoring_service.get_resonance_frequency(20)
+            
+            assert result["status_code"] == 0
+            assert result["status_text"] == "not obtained"
+            assert result["best_overall"] is None
+            assert result["best_phase"] is None
+            assert result["best_current"] is None
 
-    def test_get_resonance_frequency_hi_read_failure(self):
-        with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-             patch("backend.services.monitoring_service.manager.read") as mock_read:
-            # Provide values for all three reads: status, hi, lo
-            mock_read.side_effect = [1, None, 0x86A0]  # status=1, hi fails, lo won't be reached
-            with pytest.raises(ValueError, match="Failed to read resonance frequency registers"):
-                monitoring_service.get_resonance_frequency(20)
+    def test_get_resonance_frequency_status_2(self):
+        with patch("backend.services.monitoring_service.manager.read") as mock_read:
+            mock_read.return_value = 2  # status = failed to obtain
+            result = monitoring_service.get_resonance_frequency(20)
+            
+            assert result["status_code"] == 2
+            assert result["status_text"] == "failed to obtain"
+            assert result["best_overall"] is None
+            assert result["best_phase"] is None
+            assert result["best_current"] is None
+
+    def test_get_resonance_frequency_status_3(self):
+        with patch("backend.services.monitoring_service.manager.read") as mock_read:
+            mock_read.return_value = 3  # status = measurement in progress
+            result = monitoring_service.get_resonance_frequency(20)
+            
+            assert result["status_code"] == 3
+            assert result["status_text"] == "measurement in progress"
+            assert result["best_overall"] is None
+            assert result["best_phase"] is None
+            assert result["best_current"] is None
+
+    def test_get_resonance_frequency_unknown_status(self):
+        with patch("backend.services.monitoring_service.manager.read") as mock_read:
+            mock_read.return_value = 99  # unknown status
+            result = monitoring_service.get_resonance_frequency(20)
+            
+            assert result["status_code"] == 99
+            assert result["status_text"] == "unknown (99)"
+            assert result["best_overall"] is None
+            assert result["best_phase"] is None
+            assert result["best_current"] is None
 
     def test_get_resonance_frequency_status_read_failure(self):
-        with patch("backend.services.monitoring_service.manager.write") as mock_write, \
-             patch("backend.services.monitoring_service.manager.read") as mock_read:
+        with patch("backend.services.monitoring_service.manager.read") as mock_read:
             mock_read.return_value = None  # status read fails
             with pytest.raises(ValueError, match="Failed to read resonance frequency status register"):
+                monitoring_service.get_resonance_frequency(20)
+
+    def test_get_resonance_frequency_data_read_failure(self):
+        with patch("backend.services.monitoring_service.manager.read") as mock_read:
+            # Status is 1 (success) but one of the data reads fails
+            # Need to provide enough values for all the reads that will happen
+            mock_read.side_effect = [1, 0x0001, None, 4500, 2048,  # Best Overall fails on lo
+                                     0x0001, 0x86A1, 1000, 1500,   # Best Phase (won't be reached)
+                                     0x0001, 0x86A2, 2000, 3000]   # Best Current (won't be reached)
+            with pytest.raises(ValueError, match="Failed to read best overall frequency registers"):
                 monitoring_service.get_resonance_frequency(20)
 
     def setup_method(self):

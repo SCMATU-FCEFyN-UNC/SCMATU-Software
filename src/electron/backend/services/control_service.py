@@ -36,12 +36,6 @@ def set_power_level(power_percent: int):
     manager.write("holding", 20, 4, power_percent)
     return {"success": True, "power_percent": power_percent}
 
-def set_sample_count(sample_count: int):
-    if sample_count <= 0:
-        raise ValueError("Sample count must be positive")
-    manager.write("holding", 20, 5, sample_count)
-    return {"success": True, "samples": sample_count}
-
 def set_transducer(enabled: bool):
     """
     Enable or disable the transducer using coil 0.

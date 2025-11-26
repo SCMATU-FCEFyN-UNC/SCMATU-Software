@@ -8,12 +8,30 @@ class TestMonitoringEndpoints:
 
     def test_get_all_monitoring_success(self, client):
         mock_data = {
-            "phase": 45.0,
+            "phase": {"seconds": 0.0000045, "degrees": 81.0},  # Updated structure
             "voltage": 220.0,
             "current": 5.0,
             "power": 1100.0,
             "period": 0.02,
-            "resonance": {"resonance_frequency": 50000, "status": 1},
+            "resonance": {
+                "status_code": 1,
+                "status_text": "obtained successfully",
+                "best_overall": {
+                    "frequency": 50000,
+                    "phase": 4500,
+                    "current": 2048
+                },
+                "best_phase": {
+                    "frequency": 50001,
+                    "phase": 1000,
+                    "current": 1500
+                },
+                "best_current": {
+                    "frequency": 50002,
+                    "phase": 2000,
+                    "current": 3000
+                }
+            },
         }
 
         with patch("backend.routes.monitoring.get_phase", return_value=mock_data["phase"]) as mock_phase:
@@ -38,25 +56,34 @@ class TestMonitoringEndpoints:
                                 mock_resonance.assert_called_once()
 
     def test_get_all_monitoring_failure(self, client):
+        # Mock ALL monitoring service functions to avoid connection issues
         with patch("backend.routes.monitoring.get_phase") as mock_phase:
-            mock_phase.side_effect = Exception("Failed to read phase")
-            
-            response = client.get("/monitoring")
-            
-            assert response.status_code == 500
-            data = response.get_json()
-            assert data["success"] is False
-            assert "error" in data
-            assert "Failed to read phase" in data["error"]
+            with patch("backend.routes.monitoring.get_voltage") as mock_voltage:
+                with patch("backend.routes.monitoring.get_current") as mock_current:
+                    with patch("backend.routes.monitoring.get_power") as mock_power:
+                        with patch("backend.routes.monitoring.get_period") as mock_period:
+                            with patch("backend.routes.monitoring.get_resonance_frequency") as mock_resonance:
+                                # Make the first function called raise the exception
+                                mock_phase.side_effect = Exception("Failed to read phase")
+                                
+                                response = client.get("/monitoring")
+                                
+                                assert response.status_code == 500
+                                data = response.get_json()
+                                assert data["success"] is False
+                                assert "error" in data
+                                # Since we're mocking at the endpoint level, we should get our exact error message
+                                assert "Failed to read phase" in data["error"]
 
     def test_get_single_monitoring_phase(self, client):
-        with patch("backend.routes.monitoring.get_phase", return_value=45.0) as mock_func:
+        phase_data = {"seconds": 0.0000045, "degrees": 81.0}
+        with patch("backend.routes.monitoring.get_phase", return_value=phase_data) as mock_func:
             response = client.get("/monitoring/phase")
             
             assert response.status_code == 200
             data = response.get_json()
             assert data["success"] is True
-            assert data["phase"] == 45.0
+            assert data["phase"] == phase_data
             mock_func.assert_called_once()
 
     def test_get_single_monitoring_voltage(self, client):
@@ -100,7 +127,25 @@ class TestMonitoringEndpoints:
             mock_func.assert_called_once()
 
     def test_get_single_monitoring_resonance(self, client):
-        resonance_data = {"resonance_frequency": 50000, "status": 1}
+        resonance_data = {
+            "status_code": 1,
+            "status_text": "obtained successfully",
+            "best_overall": {
+                "frequency": 50000,
+                "phase": 4500,
+                "current": 2048
+            },
+            "best_phase": {
+                "frequency": 50001,
+                "phase": 1000,
+                "current": 1500
+            },
+            "best_current": {
+                "frequency": 50002,
+                "phase": 2000,
+                "current": 3000
+            }
+        }
         with patch("backend.routes.monitoring.get_resonance_frequency", return_value=resonance_data) as mock_func:
             response = client.get("/monitoring/resonance")
             
@@ -132,17 +177,33 @@ class TestMonitoringEndpoints:
 
     def test_get_all_monitoring_partial_failure(self, client):
         """Test when some monitoring functions work but others fail"""
-        with patch("backend.routes.monitoring.get_phase", return_value=45.0) as mock_phase:
+        phase_data = {"seconds": 0.0000045, "degrees": 81.0}
+        with patch("backend.routes.monitoring.get_phase", return_value=phase_data) as mock_phase:
             with patch("backend.routes.monitoring.get_voltage") as mock_voltage:
                 with patch("backend.routes.monitoring.get_current", return_value=5.0) as mock_current:
-                    mock_voltage.side_effect = Exception("Voltage sensor offline")
-                    
-                    response = client.get("/monitoring")
-                    
-                    assert response.status_code == 500
-                    data = response.get_json()
-                    assert data["success"] is False
-                    assert "Voltage sensor offline" in data["error"]
+                    with patch("backend.routes.monitoring.get_power") as mock_power:
+                        with patch("backend.routes.monitoring.get_period") as mock_period:
+                            with patch("backend.routes.monitoring.get_resonance_frequency") as mock_resonance:
+                                # Only voltage fails
+                                mock_voltage.side_effect = Exception("Voltage sensor offline")
+                                # Other functions return successfully
+                                mock_power.return_value = 1100.0
+                                mock_period.return_value = 0.02
+                                mock_resonance.return_value = {
+                                    "status_code": 1,
+                                    "status_text": "obtained successfully",
+                                    "best_overall": None,
+                                    "best_phase": None,
+                                    "best_current": None
+                                }
+                                
+                                response = client.get("/monitoring")
+                                
+                                assert response.status_code == 500
+                                data = response.get_json()
+                                assert data["success"] is False
+                                assert "error" in data
+                                assert "Voltage sensor offline" in data["error"]
 
     def test_metric_mapping_completeness(self):
         """Test that all metrics in the mapping are valid"""

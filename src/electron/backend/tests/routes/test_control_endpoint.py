@@ -78,21 +78,74 @@ class TestControlRoutes:
             assert data["success"] is False
             assert "error" in data
 
-    def test_set_samples_success(self, client):
-        with patch.object(control_service, "set_sample_count", return_value={"success": True, "samples": 32}):
-            response = client.post("/samples", json={"sample_count": 32})
+    def test_set_transducer_success(self, client):
+        with patch.object(control_service, "set_transducer", return_value={"success": True, "enabled": True}):
+            response = client.post("/transducer", json={"enabled": True})
             assert response.status_code == 200
             data = response.get_json()
             assert data["success"] is True
-            assert data["samples"] == 32
+            assert data["enabled"] is True
 
-    def test_set_samples_invalid(self, client):
-        with patch.object(control_service, "set_sample_count", side_effect=ValueError("Sample count must be positive")):
-            response = client.post("/samples", json={"sample_count": 0})
-            assert response.status_code == 400
+    def test_set_transducer_missing_data(self, client):
+        response = client.post("/transducer", json={})
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data["success"] is False
+        assert "error" in data
+
+    def test_get_transducer_success(self, client):
+        with patch.object(control_service, "get_transducer", return_value=True):
+            response = client.get("/transducer")
+            assert response.status_code == 200
             data = response.get_json()
-            assert data["success"] is False
-            assert "error" in data
+            assert data["success"] is True
+            assert data["enabled"] is True
+
+    def test_set_on_time_success(self, client):
+        with patch.object(control_service, "set_on_time", return_value={"success": True, "on_time": 500}):
+            response = client.post("/on_time", json={"on_time_ms": 500})
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["success"] is True
+            assert data["on_time"] == 500  # Note: service returns "on_time" not "on_time_ms"
+
+    def test_set_on_time_missing_data(self, client):
+        response = client.post("/on_time", json={})
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data["success"] is False
+        assert "error" in data
+
+    def test_get_on_time_success(self, client):
+        with patch.object(control_service, "get_on_time", return_value=500):
+            response = client.get("/on_time")
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["success"] is True
+            assert data["on_time_ms"] == 500
+
+    def test_set_off_time_success(self, client):
+        with patch.object(control_service, "set_off_time", return_value={"success": True, "off_time": 300}):
+            response = client.post("/off_time", json={"off_time_ms": 300})
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["success"] is True
+            assert data["off_time"] == 300  # Note: service returns "off_time" not "off_time_ms"
+
+    def test_set_off_time_missing_data(self, client):
+        response = client.post("/off_time", json={})
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data["success"] is False
+        assert "error" in data
+
+    def test_get_off_time_success(self, client):
+        with patch.object(control_service, "get_off_time", return_value=300):
+            response = client.get("/off_time")
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["success"] is True
+            assert data["off_time_ms"] == 300
 
 
 @pytest.fixture
