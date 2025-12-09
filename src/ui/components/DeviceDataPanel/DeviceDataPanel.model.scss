@@ -1,0 +1,89 @@
+.panel {
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  padding: 1rem;
+  background: #f9f9f9;
+  margin-top: 1rem;
+  max-width: 500px;
+
+  h2 {
+    margin-bottom: 1rem;
+    font-size: 1.4rem;
+    color: #333;
+  }
+}
+
+.fieldGroup {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+
+  label {
+    font-weight: bold;
+    margin-bottom: 0.3rem;
+  }
+
+  input {
+    padding: 0.4rem;
+    font-size: 1rem;
+    border: 1px solid #bbb;
+    border-radius: 5px;
+    margin-bottom: 0.5rem;
+
+    &:disabled {
+      background: #e0e0e0;
+      cursor: not-allowed;
+    }
+
+    &[readonly] {
+      background: #f0f0f0;
+    }
+  }
+
+  select {
+    padding: 0.4rem;
+    font-size: 1rem;
+    border: 1px solid #bbb;
+    border-radius: 5px;
+    margin-bottom: 0.5rem;
+
+    &:disabled {
+      background: #e0e0e0;
+      cursor: not-allowed;
+    }
+  }
+
+  .buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.95rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    background: #007bff;
+    color: white;
+    transition: background 0.2s ease-in-out;
+
+    &:hover:not(:disabled) {
+      background: #0056b3;
+    }
+
+    &:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.message {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  font-size: 0.95rem;
+  color: #333;
+  border-radius: 5px;
+  background: #f0f0f0;
+}
