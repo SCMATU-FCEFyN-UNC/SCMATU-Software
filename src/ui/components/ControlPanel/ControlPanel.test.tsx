@@ -58,8 +58,15 @@ describe("ControlPanel", () => {
       // Check initial values
       expect(screen.getByDisplayValue("60000")).toBeInTheDocument();
       expect(screen.getByDisplayValue("50")).toBeInTheDocument();
-      expect(screen.getByDisplayValue("100")).toBeInTheDocument();
-      expect(screen.getByDisplayValue("10")).toBeInTheDocument();
+
+      // There are two inputs with display value "100" (On Time and Off Time)
+      const hundredInputs = screen.getAllByDisplayValue("100");
+      expect(hundredInputs.length).toBeGreaterThanOrEqual(2);
+
+      // Ensure both On Time and Off Time exist via spinbutton positions
+      const spinbuttons = screen.getAllByRole("spinbutton");
+      expect(spinbuttons[2]).toHaveValue(100);
+      expect(spinbuttons[3]).toHaveValue(100);
     });
 
     it("disables all inputs when disconnected", async () => {
@@ -69,13 +76,14 @@ describe("ControlPanel", () => {
 
       const frequencyInput = screen.getByDisplayValue("60000");
       const powerInput = screen.getByDisplayValue("50");
-      const samplesInput = screen.getByDisplayValue("100");
-      const stepInput = screen.getByDisplayValue("10");
+      const spinbuttons = screen.getAllByRole("spinbutton");
+      const onTimeInput = spinbuttons[2];
+      const offTimeInput = spinbuttons[3];
 
       expect(frequencyInput).toBeDisabled();
       expect(powerInput).toBeDisabled();
-      expect(samplesInput).toBeDisabled();
-      expect(stepInput).toBeDisabled();
+      expect(onTimeInput).toBeDisabled();
+      expect(offTimeInput).toBeDisabled();
     });
 
     it("disables all buttons when disconnected", async () => {
@@ -140,13 +148,14 @@ describe("ControlPanel", () => {
 
       const frequencyInput = screen.getByDisplayValue("60000");
       const powerInput = screen.getByDisplayValue("50");
-      const samplesInput = screen.getByDisplayValue("100");
-      const stepInput = screen.getByDisplayValue("10");
+      const spinbuttons = screen.getAllByRole("spinbutton");
+      const onTimeInput = spinbuttons[2];
+      const offTimeInput = spinbuttons[3];
 
       expect(frequencyInput).toBeEnabled();
       expect(powerInput).toBeEnabled();
-      expect(samplesInput).toBeEnabled();
-      expect(stepInput).toBeEnabled();
+      expect(onTimeInput).toBeEnabled();
+      expect(offTimeInput).toBeEnabled();
     });
 
     it("enables all buttons when connected", async () => {
@@ -234,7 +243,7 @@ describe("ControlPanel", () => {
       expect(screen.getByText("✅ Power level updated")).toBeInTheDocument();
     });
 
-    it("calls set samples endpoint when Set Samples button is clicked", async () => {
+    it("calls set on time endpoint when Set On Time button is clicked", async () => {
       mockMakeRequest.mockResolvedValueOnce({ data: { success: true } });
 
       await act(async () => {
@@ -242,25 +251,25 @@ describe("ControlPanel", () => {
       });
 
       const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const samplesSetButton = setButtons[2];
+      const onTimeSetButton = setButtons[2];
 
       await act(async () => {
-        fireEvent.click(samplesSetButton);
+        fireEvent.click(onTimeSetButton);
       });
 
       await waitFor(() => {
-        expect(mockMakeRequest).toHaveBeenCalledWith("/samples", {
+        expect(mockMakeRequest).toHaveBeenCalledWith("/on_time", {
           method: "POST",
-          data: { sample_count: 100 },
+          data: { on_time_ms: 100 },
         });
       });
 
       await waitFor(() => {
-        expect(screen.getByText(/✅ Sample count updated/)).toBeInTheDocument();
+        expect(screen.getByText(/✅ On time updated/)).toBeInTheDocument();
       });
     });
 
-    it("calls set frequency step endpoint when Set Step button is clicked", async () => {
+    it("calls set off time endpoint when Set Off Time button is clicked", async () => {
       mockMakeRequest.mockResolvedValueOnce({ data: { success: true } });
 
       await act(async () => {
@@ -268,16 +277,16 @@ describe("ControlPanel", () => {
       });
 
       const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const stepSetButton = setButtons[3];
-      fireEvent.click(stepSetButton);
+      const offTimeSetButton = setButtons[3];
+      fireEvent.click(offTimeSetButton);
 
       await waitFor(() => {
-        expect(mockMakeRequest).toHaveBeenCalledWith("/frequency-step", {
+        expect(mockMakeRequest).toHaveBeenCalledWith("/off_time", {
           method: "POST",
-          data: { step_hz: 10 },
+          data: { off_time_ms: 100 },
         });
       });
-      expect(screen.getByText("✅ Frequency step updated")).toBeInTheDocument();
+      expect(screen.getByText("✅ Off time updated")).toBeInTheDocument();
     });
 
     it("displays error message when request fails", async () => {
@@ -371,26 +380,28 @@ describe("ControlPanel", () => {
       expect(powerInput.value).toBe("100");
     });
 
-    it("handles sample count minimum value", async () => {
+    it("handles on time minimum value", async () => {
       await act(async () => {
         render(<ControlPanel />);
       });
 
-      const samplesInput = screen.getByDisplayValue("100") as HTMLInputElement;
+      const spinbuttons = screen.getAllByRole("spinbutton");
+      const onTimeInput = spinbuttons[2] as HTMLInputElement;
 
-      fireEvent.change(samplesInput, { target: { value: "1" } });
-      expect(samplesInput.value).toBe("1");
+      fireEvent.change(onTimeInput, { target: { value: "1" } });
+      expect(onTimeInput.value).toBe("1");
     });
 
-    it("handles frequency step minimum value", async () => {
+    it("handles off time minimum value", async () => {
       await act(async () => {
         render(<ControlPanel />);
       });
 
-      const stepInput = screen.getByDisplayValue("10") as HTMLInputElement;
+      const spinbuttons = screen.getAllByRole("spinbutton");
+      const offTimeInput = spinbuttons[3] as HTMLInputElement;
 
-      fireEvent.change(stepInput, { target: { value: "1" } });
-      expect(stepInput.value).toBe("1");
+      fireEvent.change(offTimeInput, { target: { value: "1" } });
+      expect(offTimeInput.value).toBe("1");
     });
 
     it("clears previous message when making new request", async () => {
@@ -436,13 +447,14 @@ describe("ControlPanel", () => {
 
       const frequencyInput = screen.getByDisplayValue("60000");
       const powerInput = screen.getByDisplayValue("50");
-      const samplesInput = screen.getByDisplayValue("100");
-      const stepInput = screen.getByDisplayValue("10");
+      const spinbuttons = screen.getAllByRole("spinbutton");
+      const onTimeInput = spinbuttons[2];
+      const offTimeInput = spinbuttons[3];
 
       expect(frequencyInput).toBeDisabled();
       expect(powerInput).toBeDisabled();
-      expect(samplesInput).toBeDisabled();
-      expect(stepInput).toBeDisabled();
+      expect(onTimeInput).toBeDisabled();
+      expect(offTimeInput).toBeDisabled();
     });
 
     it("disables all buttons when resonance is running", async () => {

@@ -49,18 +49,19 @@ describe("MonitoringPanel", () => {
 
     expect(screen.getByText("Monitoring Panel")).toBeInTheDocument();
 
-    // Check that we have 7 input fields
+    // There are 15 text inputs: 2 (phase) + 1 (voltage) + 1 (current) + 1 (power)
+    // + 1 (period) + 9 (resonance grid: 3 rows * 3 columns) = 15
     const inputs = screen.getAllByRole("textbox");
-    expect(inputs).toHaveLength(7);
+    expect(inputs).toHaveLength(15);
 
     // Check that we have 5 unit selectors
     const selectors = screen.getAllByRole("combobox");
     expect(selectors).toHaveLength(5);
 
-    // Verify all inputs are empty
-    inputs.forEach((input) => {
-      expect(input).toHaveValue("");
-    });
+    // The first 6 inputs (phase, voltage, current, power, period) should be empty
+    // and the last 9 (resonance grid) should show "-" when no data is loaded.
+    inputs.slice(0, 6).forEach((input) => expect(input).toHaveValue(""));
+    inputs.slice(6).forEach((input) => expect(input).toHaveValue("-"));
 
     expect(screen.getByText("🔄 Refresh All")).toBeInTheDocument();
     expect(screen.getByText("📊 Measure Resonance")).toBeInTheDocument();
@@ -74,8 +75,15 @@ describe("MonitoringPanel", () => {
       power: 1146.6,
       period: 0.02,
       resonance: {
-        resonance_frequency: 50000,
+        status_code: 200,
         status_text: "obtained successfully",
+        best_overall: {
+          frequency: 50000,
+          phase: 10,
+          current: 5.2,
+        },
+        best_phase: null,
+        best_current: null,
       },
     };
 
@@ -100,14 +108,18 @@ describe("MonitoringPanel", () => {
       });
     });
 
-    // Check for the actual displayed values
+    // Check formatted values
     expect(screen.getByDisplayValue("1234")).toBeInTheDocument(); // phase time in ns
-    expect(screen.getByDisplayValue("-45.00°")).toBeInTheDocument(); // phase angle in degrees
+    expect(screen.getByDisplayValue("-45.00°")).toBeInTheDocument(); // phase angle
     expect(screen.getByDisplayValue("220.500")).toBeInTheDocument(); // voltage
     expect(screen.getByDisplayValue("5.2000")).toBeInTheDocument(); // current
     expect(screen.getByDisplayValue("1146.600")).toBeInTheDocument(); // power
     expect(screen.getByDisplayValue("0.020000")).toBeInTheDocument(); // period
-    expect(screen.getByDisplayValue("50.000")).toBeInTheDocument(); // resonance frequency (FIXED: no commas)
+
+    // resonance frequencies are displayed with locale formatting
+    expect(
+      screen.getByDisplayValue((50000).toLocaleString())
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Status: obtained successfully")
     ).toBeInTheDocument();
@@ -136,10 +148,9 @@ describe("MonitoringPanel", () => {
       render(<MonitoringPanel />);
     });
 
-    // Find all refresh buttons and click the phase one (first one)
     const refreshButtons = screen.getAllByText("Refresh");
     await act(async () => {
-      fireEvent.click(refreshButtons[0]); // Phase refresh button
+      fireEvent.click(refreshButtons[0]); // Phase refresh
     });
 
     await waitFor(() => {
@@ -148,16 +159,14 @@ describe("MonitoringPanel", () => {
       });
     });
 
-    expect(screen.getByDisplayValue("500")).toBeInTheDocument(); // phase time in ns
-    expect(screen.getByDisplayValue("30.00°")).toBeInTheDocument(); // phase angle in degrees
+    expect(screen.getByDisplayValue("500")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("30.00°")).toBeInTheDocument();
     expect(screen.getByText("✅ Phase updated")).toBeInTheDocument();
 
-    // Reset mock calls to track the next one
     mockMakeRequest.mockClear();
 
-    // Click voltage refresh button (second one)
     await act(async () => {
-      fireEvent.click(refreshButtons[1]); // Voltage refresh button
+      fireEvent.click(refreshButtons[1]); // Voltage refresh
     });
 
     await waitFor(() => {
@@ -174,8 +183,15 @@ describe("MonitoringPanel", () => {
       data: {
         success: true,
         resonance: {
-          resonance_frequency: 45000,
+          status_code: 200,
           status_text: "obtained successfully",
+          best_overall: {
+            frequency: 45000,
+            phase: 8,
+            current: 4.8,
+          },
+          best_phase: null,
+          best_current: null,
         },
       },
     });
@@ -184,10 +200,9 @@ describe("MonitoringPanel", () => {
       render(<MonitoringPanel />);
     });
 
-    // Find all refresh buttons and click the resonance one (last one)
     const refreshButtons = screen.getAllByText("Refresh");
     await act(async () => {
-      fireEvent.click(refreshButtons[5]); // Resonance refresh button (6th button)
+      fireEvent.click(refreshButtons[5]); // Resonance refresh button
     });
 
     await waitFor(() => {
@@ -196,7 +211,9 @@ describe("MonitoringPanel", () => {
       });
     });
 
-    expect(screen.getByDisplayValue("45.000")).toBeInTheDocument(); // FIXED: no commas
+    expect(
+      screen.getByDisplayValue((45000).toLocaleString())
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Status: obtained successfully")
     ).toBeInTheDocument();
@@ -206,7 +223,6 @@ describe("MonitoringPanel", () => {
   });
 
   it("handles API errors gracefully", async () => {
-    // Mock console.error to suppress the error log in test output
     const consoleErrorMock = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
@@ -225,7 +241,6 @@ describe("MonitoringPanel", () => {
       expect(screen.getByText("❌ Request failed")).toBeInTheDocument();
     });
 
-    // Restore console.error
     consoleErrorMock.mockRestore();
   });
 
@@ -327,12 +342,10 @@ describe("MonitoringPanel", () => {
       });
 
       const refreshAllButton = screen.getByText("🔄 Refresh All");
-
       await act(async () => {
         fireEvent.click(refreshAllButton);
       });
 
-      // Wait to ensure no API calls are made
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(mockMakeRequest).not.toHaveBeenCalled();
@@ -347,8 +360,15 @@ describe("MonitoringPanel", () => {
       power: 152.415,
       period: 0.000123,
       resonance: {
-        resonance_frequency: 1234567,
+        status_code: 200,
         status_text: "measured",
+        best_overall: {
+          frequency: 1234567,
+          phase: 90,
+          current: 6.5,
+        },
+        best_phase: null,
+        best_current: null,
       },
     };
 
@@ -368,13 +388,15 @@ describe("MonitoringPanel", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("12345")).toBeInTheDocument(); // phase time (ns)
-      expect(screen.getByDisplayValue("12345.00°")).toBeInTheDocument(); // phase angle (degrees)
-      expect(screen.getByDisplayValue("123.456")).toBeInTheDocument(); // voltage
-      expect(screen.getByDisplayValue("1.2346")).toBeInTheDocument(); // current
-      expect(screen.getByDisplayValue("152.415")).toBeInTheDocument(); // power
-      expect(screen.getByDisplayValue("1.230e-4")).toBeInTheDocument(); // period
-      expect(screen.getByDisplayValue("1.234.567")).toBeInTheDocument(); // FIXED: resonance frequency with dots
+      expect(screen.getByDisplayValue("12345")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("12345.00°")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("123.456")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("1.2346")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("152.415")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("1.230e-4")).toBeInTheDocument();
+      expect(
+        screen.getByDisplayValue((1234567).toLocaleString())
+      ).toBeInTheDocument();
     });
 
     expect(screen.getByText("Status: measured")).toBeInTheDocument();
@@ -385,11 +407,11 @@ describe("MonitoringPanel", () => {
       render(<MonitoringPanel />);
     });
 
-    // All inputs should be empty when data is null
+    // There are 15 text boxes; the first 6 are empty, last 9 show '-' placeholders.
     const inputs = screen.getAllByRole("textbox");
-    inputs.forEach((input) => {
-      expect(input).toHaveValue("");
-    });
+    expect(inputs).toHaveLength(15);
+    inputs.slice(0, 6).forEach((i) => expect(i).toHaveValue(""));
+    inputs.slice(6).forEach((i) => expect(i).toHaveValue("-"));
   });
 
   it("shows loading state during requests", async () => {
@@ -405,30 +427,34 @@ describe("MonitoringPanel", () => {
       fireEvent.click(refreshAllButton);
     });
 
-    // Button should be disabled during loading
     expect(refreshAllButton).toBeDisabled();
 
-    // Check that individual refresh buttons are also disabled during loading
     const refreshButtons = screen.getAllByText("Refresh");
     refreshButtons.forEach((button) => {
       expect(button).toBeDisabled();
     });
 
-    // Check that Measure Resonance button is also disabled
     const measureResonanceButton = screen.getByText("📊 Measure Resonance");
     expect(measureResonanceButton).toBeDisabled();
   });
 
   it("shows phase relationships correctly", async () => {
     const mockData = {
-      phase: { seconds: -0.000001874, degrees: -187.4 }, // Negative phase - current leads voltage
+      phase: { seconds: -0.000001874, degrees: -187.4 },
       voltage: 220.5,
       current: 5.2,
       power: 1146.6,
       period: 0.02,
       resonance: {
-        resonance_frequency: 50000,
+        status_code: 200,
         status_text: "obtained successfully",
+        best_overall: {
+          frequency: 50000,
+          phase: 10,
+          current: 5.2,
+        },
+        best_phase: null,
+        best_current: null,
       },
     };
 
@@ -451,7 +477,6 @@ describe("MonitoringPanel", () => {
       expect(screen.getByText("(current leads voltage)")).toBeInTheDocument();
     });
 
-    // Test positive phase - voltage leads current
     const mockDataPositive = {
       ...mockData,
       phase: { seconds: 0.000001874, degrees: 187.4 },
@@ -472,7 +497,6 @@ describe("MonitoringPanel", () => {
       expect(screen.getByText("(voltage leads current)")).toBeInTheDocument();
     });
 
-    // Test zero phase - in phase
     const mockDataZero = {
       ...mockData,
       phase: { seconds: 0, degrees: 0 },
@@ -496,14 +520,21 @@ describe("MonitoringPanel", () => {
 
   it("allows unit selection changes", async () => {
     const mockData = {
-      phase: { seconds: 0.000001234, degrees: 123.4 }, // 1234 ns
+      phase: { seconds: 0.000001234, degrees: 123.4 },
       voltage: 220.5,
-      current: 1.5, // 1.5 A
-      power: 330.75, // 330.75 VA
-      period: 0.001, // 0.001 s
+      current: 1.5,
+      power: 330.75,
+      period: 0.001,
       resonance: {
-        resonance_frequency: 50000,
+        status_code: 200,
         status_text: "obtained successfully",
+        best_overall: {
+          frequency: 50000,
+          phase: 10,
+          current: 5.2,
+        },
+        best_phase: null,
+        best_current: null,
       },
     };
 
@@ -522,57 +553,50 @@ describe("MonitoringPanel", () => {
       fireEvent.click(screen.getByText("🔄 Refresh All"));
     });
 
-    // Get all unit selectors
     const selectors = screen.getAllByRole("combobox");
 
-    // Change phase time from ns to µs
     await act(async () => {
       fireEvent.change(selectors[0], { target: { value: "µs" } });
     });
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("1.234")).toBeInTheDocument(); // 1234 ns = 1.234 µs
+      expect(screen.getByDisplayValue("1.234")).toBeInTheDocument();
     });
 
-    // Change phase angle from degrees to radians
     await act(async () => {
       fireEvent.change(selectors[1], { target: { value: "rad" } });
     });
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("0.686π")).toBeInTheDocument(); // 123.4° ≈ 0.686π rad
+      expect(screen.getByDisplayValue("0.686π")).toBeInTheDocument();
     });
 
-    // Change current from A to mA
     await act(async () => {
       fireEvent.change(selectors[2], { target: { value: "mA" } });
     });
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("1500.0000")).toBeInTheDocument(); // 1.5 A = 1500 mA
+      expect(screen.getByDisplayValue("1500.0000")).toBeInTheDocument();
     });
 
-    // Change power from VA to kVA
     await act(async () => {
       fireEvent.change(selectors[3], { target: { value: "kVA" } });
     });
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("0.331")).toBeInTheDocument(); // 330.75 VA = 0.33075 kVA
+      expect(screen.getByDisplayValue("0.331")).toBeInTheDocument();
     });
 
-    // Change period from s to ms
     await act(async () => {
       fireEvent.change(selectors[4], { target: { value: "ms" } });
     });
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("1.000000")).toBeInTheDocument(); // 0.001 s = 1 ms
+      expect(screen.getByDisplayValue("1.000000")).toBeInTheDocument();
     });
   });
 
   it("disables unit selectors when disconnected or resonance is running", async () => {
-    // Test when disconnected
     mockUseConnection.mockReturnValue({
       connected: false,
       setConnected: vi.fn(),
@@ -589,7 +613,6 @@ describe("MonitoringPanel", () => {
       expect(selector).toBeDisabled();
     });
 
-    // Test when resonance is running
     mockUseConnection.mockReturnValue({
       connected: true,
       setConnected: vi.fn(),
@@ -612,7 +635,7 @@ describe("MonitoringPanel", () => {
   });
 
   it("disables unit selectors when loading", async () => {
-    mockMakeRequest.mockImplementation(() => new Promise(() => {})); // Never resolves
+    mockMakeRequest.mockImplementation(() => new Promise(() => {}));
 
     await act(async () => {
       render(<MonitoringPanel />);
