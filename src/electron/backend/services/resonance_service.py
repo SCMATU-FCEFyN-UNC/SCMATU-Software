@@ -2,8 +2,8 @@ from backend.services.connection_manager import manager
 
 def get_frequency_range_start():
     
-    start_hi = manager.read("holding", 20, 10)
-    start_lo = manager.read("holding", 20, 11)
+    start_hi = manager.read("holding", 20, 9)
+    start_lo = manager.read("holding", 20, 10)
 
     if start_hi is None or start_lo is None:
         raise ValueError("Failed to read frequency range start registers")
@@ -19,13 +19,13 @@ def set_frequency_range_start(start_hz: int):
     start_freq_hi = (start_hz >> 16) & 0xFFFF
     start_freq_lo = start_hz & 0xFFFF
 
-    manager.write("holding", 20, 10, start_freq_hi)
-    manager.write("holding", 20, 11, start_freq_lo)
+    manager.write("holding", 20, 9, start_freq_hi)
+    manager.write("holding", 20, 10, start_freq_lo)
     return {"success": True, "frequency_range_start": start_hz}
 
 def get_frequency_range_end():
-    end_hi = manager.read("holding", 20, 12)
-    end_lo = manager.read("holding", 20, 13)
+    end_hi = manager.read("holding", 20, 11)
+    end_lo = manager.read("holding", 20, 12)
 
     if end_hi is None or end_lo is None:
         raise ValueError("Failed to read frequency range start registers")
@@ -41,12 +41,12 @@ def set_frequency_range_end(end_hz: int):
     end_freq_hi = (end_hz >> 16) & 0xFFFF
     end_freq_lo = end_hz & 0xFFFF
 
-    manager.write("holding", 20, 12, end_freq_hi)
-    manager.write("holding", 20, 13, end_freq_lo)
+    manager.write("holding", 20, 11, end_freq_hi)
+    manager.write("holding", 20, 12, end_freq_lo)
     return {"success": True, "frequency_range_end": end_hz}
 
 def get_frequency_step():
-    step_hz = manager.read("holding", 20, 9)
+    step_hz = manager.read("holding", 20, 8)
     if step_hz is None:
         raise ValueError("Failed to read frequency step register")
     return {"success": True, "frequency_step": step_hz}
@@ -54,7 +54,7 @@ def get_frequency_step():
 def set_frequency_step(step_hz: int):
     if step_hz <= 0:
         raise ValueError("Step must be positive")
-    manager.write("holding", 20, 9, step_hz)
+    manager.write("holding", 20, 8, step_hz)
     return {"success": True, "frequency_step": step_hz}
 
 def start_resonance_measurement(slave: int = 20):

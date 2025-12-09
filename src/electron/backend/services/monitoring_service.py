@@ -75,7 +75,7 @@ def get_voltage(slave: int = 20) -> float:
     if voltage_adc is None:
         raise ValueError("Failed to read voltage ADC register")
 
-    v_gain = manager.read("holding", slave, 14)      # calibration gain
+    v_gain = manager.read("holding", slave, 13)      # calibration gain
     if v_gain is None or v_gain == 0:
         raise ValueError("Invalid voltage gain read")
 
@@ -112,11 +112,11 @@ def get_current(slave: int = 20) -> float:
     if current_adc is None:
         raise ValueError("Failed to read current ADC register")
 
-    c_gain = manager.read("holding", slave, 15)      # calibration gain
+    c_gain = manager.read("holding", slave, 14)      # calibration gain
     if c_gain is None or c_gain == 0:
         raise ValueError("Invalid current gain read")
 
-    r_shunt = manager.read("holding", slave, 16)  # shunt resistor value
+    r_shunt = manager.read("holding", slave, 15)  # shunt resistor value
     if r_shunt is None or r_shunt == 0:
         raise ValueError("Invalid shunt resistor value read")
     
