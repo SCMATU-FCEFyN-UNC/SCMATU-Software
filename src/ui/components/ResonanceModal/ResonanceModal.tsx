@@ -11,6 +11,9 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [stabilizeS, setStabilizeS] = useState<number>(0.15);
   const [mode, setMode] = useState<"firmware" | "software">("firmware");
   const [message, setMessage] = useState<string | null>(null);
+  const [firmwareUpdateStatus, setFirmwareUpdateStatus] = useState<
+    string | null
+  >(null);
 
   // New state for obtained frequency results with all fields
   const [obtainedFrequencies, setObtainedFrequencies] = useState<{
@@ -110,7 +113,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   ? {
                       frequency: resonanceData.best_overall.frequency,
                       phase_ns: resonanceData.best_overall.phase,
-                      phase_deg: null, // Old endpoint doesn't have phase_deg
+                      phase_deg: null,
                       current: resonanceData.best_overall.current,
                     }
                   : null,
@@ -149,23 +152,43 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (running) {
+      // Clear firmware update status when starting new measurement
+      setFirmwareUpdateStatus(null);
+
       interval = setInterval(async () => {
         try {
           const res = await makeRequest("/resonance/status", { method: "GET" });
           const { status_code, status_text, ...otherData } = res.data;
           setStatusText(status_text);
 
-          // Extract results if available in the response (works for both modes now)
+          // Extract results if available in the response (for BOTH modes now)
           extractResultsFromStatus(otherData);
 
           if (status_code === 1 || status_code === 2) {
             setRunning(false);
             clearInterval(interval);
-            setMessage(
+
+            const successMessage =
               status_code === 1
                 ? "✅ Resonance frequency obtained successfully!"
-                : "❌ Failed to obtain resonance frequency."
-            );
+                : "❌ Failed to obtain resonance frequency.";
+
+            // Add firmware update info for software mode
+            if (status_code === 1 && mode === "software") {
+              setFirmwareUpdateStatus(
+                "Updating firmware with resonance frequency..."
+              );
+
+              // The backend should have already updated the firmware automatically
+              // but we can display a confirmation message after a delay
+              setTimeout(() => {
+                setFirmwareUpdateStatus(
+                  "✓ Firmware updated with resonance frequency"
+                );
+              }, 1000);
+            }
+
+            setMessage(successMessage);
 
             // For firmware mode, make sure we have the latest results
             if (status_code === 1 && mode === "firmware") {
@@ -466,6 +489,17 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
 
         {message && <p className="message">{message}</p>}
+
+        {/* Add firmware update status display here */}
+        {firmwareUpdateStatus && (
+          <p
+            className={`firmware-update-status ${
+              firmwareUpdateStatus.includes("✓") ? "success" : "info"
+            }`}
+          >
+            {firmwareUpdateStatus}
+          </p>
+        )}
 
         <div className="buttons">
           <button

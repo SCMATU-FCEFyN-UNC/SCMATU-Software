@@ -127,3 +127,35 @@ def get_resonance_status_endpoint():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+    
+@resonance_bp.route("/update_firmware", methods=["POST"])
+def update_firmware_with_external_result():
+    """
+    Manually update firmware with an externally obtained resonance frequency.
+    Accepts JSON: {"frequency": 123456}
+    """
+    try:
+        data = request.get_json()
+        if not data or "frequency" not in data:
+            return jsonify({"success": False, "error": "Frequency parameter required"}), 400
+        
+        frequency = int(data["frequency"])
+        
+        # Import the function from service
+        from backend.services.resonance_service import _update_firmware_with_external_result
+        
+        success = _update_firmware_with_external_result(frequency, slave=20)
+        
+        if success:
+            return jsonify({
+                "success": True, 
+                "message": f"Updated firmware with resonance frequency {frequency} Hz"
+            }), 200
+        else:
+            return jsonify({
+                "success": False, 
+                "error": "Failed to update firmware"
+            }), 500
+            
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500

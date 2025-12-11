@@ -190,6 +190,18 @@ def _sweep_worker(start_hz: int, end_hz: int, step_hz: int, stabilize_s: float, 
             _sweep_state["best_current"] = picks["best_current"]
             _sweep_state["status_code"] = 1
             _sweep_state["status_text"] = "obtained successfully"
+            
+            # NEW: Update firmware with external result
+            if _sweep_state["best_overall"] and _sweep_state["best_overall"].get("frequency"):
+                best_freq = _sweep_state["best_overall"]["frequency"]
+                print(f"Software sweep completed. Best overall frequency: {best_freq} Hz", flush=True)
+                
+                # Update firmware with the external result
+                success = _update_firmware_with_external_result(best_freq, slave)
+                if success:
+                    print("Successfully updated firmware with external resonance frequency", flush=True)
+                else:
+                    print("Failed to update firmware with external result", flush=True)
         else:
             _sweep_state["status_code"] = 2
             _sweep_state["status_text"] = "failed to obtain"
@@ -347,3 +359,31 @@ def get_resonance_status(slave: int = 20):
             }
 
     return response
+
+# Add this function to resonance_service.py, after the helper functions:
+
+def _update_firmware_with_external_result(best_overall_freq: int, slave: int = 20):
+    """
+    Write the externally obtained resonance frequency to firmware registers
+    and trigger coil 6 to make firmware update its state.
+    """
+    try:
+        # Split frequency into hi and lo parts
+        freq_hi = (best_overall_freq >> 16) & 0xFFFF
+        freq_lo = best_overall_freq & 0xFFFF
+        
+        # Write to holding registers 21 and 22
+        manager.write("holding", slave, 21, freq_hi)
+        manager.write("holding", slave, 22, freq_lo)
+        
+        print(f"Written external resonance frequency {best_overall_freq} Hz to registers 21-22", flush=True)
+        
+        # Trigger coil 6 to make firmware process the external result
+        manager.write("coil", slave, 6, 1)
+        print("Triggered coil 6 to update firmware state", flush=True)
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error updating firmware with external result: {e}", flush=True)
+        return False

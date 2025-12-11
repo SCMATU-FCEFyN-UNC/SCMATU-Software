@@ -307,3 +307,23 @@
     transform: scale(1);
   }
 }
+
+.firmware-update-status {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 0.95em;
+  text-align: center;
+  
+  &.info {
+    background-color: #e7f3ff;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+  }
+  
+  &.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+}
