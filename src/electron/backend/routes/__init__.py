@@ -4,6 +4,7 @@ from .control import control_bp
 from .monitoring import monitoring_bp
 from .resonance import resonance_bp
 from .device import device_bp
+from .folders import folders_bp
 
 def register_routes(app):
     app.register_blueprint(hello_bp)
@@ -12,3 +13,4 @@ def register_routes(app):
     app.register_blueprint(monitoring_bp)
     app.register_blueprint(resonance_bp)
     app.register_blueprint(device_bp)
+    app.register_blueprint(folders_bp)

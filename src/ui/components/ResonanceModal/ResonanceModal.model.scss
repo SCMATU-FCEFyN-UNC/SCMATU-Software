@@ -28,19 +28,22 @@
     color: #333;
   }
 
-  .fieldGroup {
+  .resonance-field-group {
     margin-bottom: 12px;
     display: flex;
     flex-direction: column;
     gap: 4px;
 
-    label {
+    .resonance-field-label {
       font-weight: 500;
       color: #444;
       font-size: 0.95em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    input {
+    .resonance-field-input {
       padding: 8px 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
@@ -70,7 +73,7 @@
         padding: 0 8px;
       }
 
-      label {
+      .resonance-radio-label {
         display: flex;
         align-items: center;
         gap: 6px;
@@ -80,17 +83,21 @@
         &:last-child {
           margin-bottom: 0;
         }
+        
+        .resonance-radio-input {
+          margin: 0;
+        }
       }
     }
 
-    small {
+    .resonance-field-hint {
       color: #666;
       font-size: 0.85em;
       margin-top: 4px;
     }
   }
 
-  .obtained-frequencies-section {
+  .resonance-obtained-frequencies-section {
     margin: 20px 0;
     padding: 15px;
     background-color: #f8f9fa;
@@ -104,20 +111,20 @@
       font-size: 1.1em;
     }
 
-    .mode-indicator {
+    .resonance-mode-indicator {
       margin-bottom: 15px;
       color: #666;
       font-style: italic;
     }
   }
 
-  .frequency-cards-grid {
+  .resonance-frequency-cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 15px;
   }
 
-  .frequency-card {
+  .resonance-frequency-card {
     background-color: white;
     border-radius: 6px;
     padding: 15px;
@@ -135,14 +142,14 @@
     }
   }
 
-  .frequency-grid-2x2 {
+  .resonance-frequency-grid-2x2 {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(2, auto);
     gap: 10px;
   }
 
-  .frequency-field {
+  .resonance-frequency-field {
     display: flex;
     flex-direction: column;
     
@@ -158,7 +165,7 @@
     }
   }
 
-  .readonly-field {
+  .resonance-readonly-field {
     width: 100%;
     padding: 6px 8px;
     border: 1px solid #ddd;
@@ -177,7 +184,7 @@
     }
   }
 
-  .status-section {
+  .resonance-status-section {
     margin: 16px 0;
     padding: 12px;
     background-color: #f8f9fa;
@@ -189,7 +196,7 @@
       font-size: 0.95em;
     }
 
-    .loading-indicator {
+    .resonance-loading-indicator {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -197,7 +204,7 @@
       color: #555;
       margin-top: 12px;
 
-      .spinner {
+      .resonance-spinner {
         width: 32px;
         height: 32px;
         border: 3px solid #ccc;
@@ -214,7 +221,7 @@
     }
   }
 
-  .message {
+  .resonance-message {
     margin: 12px 0;
     padding: 10px 12px;
     border-radius: 6px;
@@ -308,7 +315,7 @@
   }
 }
 
-.firmware-update-status {
+.resonance-firmware-update-status {
   margin: 12px 0;
   padding: 10px 12px;
   border-radius: 6px;
@@ -325,5 +332,118 @@
     background-color: #d4edda;
     color: #155724;
     border: 1px solid #c3e6cb;
+  }
+}
+
+.resonance-save-results-section {
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  
+  .resonance-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    
+    .resonance-checkbox-input {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    
+    span {
+      font-weight: 500;
+      color: #495057;
+    }
+  }
+  
+  .resonance-save-folder-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #ced4da;
+    
+    .resonance-folder-select-button {
+      padding: 8px 16px;
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: background-color 0.2s;
+      
+      &:hover:not(:disabled) {
+        background-color: #545b62;
+      }
+      
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+    
+    .resonance-folder-path-display {
+      margin-top: 8px;
+      padding: 6px 8px;
+      background-color: #e9ecef;
+      border-radius: 4px;
+      border: 1px solid #ced4da;
+      
+      small {
+        color: #495057;
+        font-family: monospace;
+        word-break: break-all;
+      }
+    }
+    
+    .resonance-folder-path-warning {
+      margin-top: 8px;
+      color: #856404;
+      background-color: #fff3cd;
+      border: 1px solid #ffeaa7;
+      padding: 6px 8px;
+      border-radius: 4px;
+    }
+  }
+  
+  .resonance-folder-path-info {
+    margin-top: 10px;
+    padding: 6px 8px;
+    background-color: #e7f3ff;
+    border-radius: 4px;
+    border: 1px solid #bee5eb;
+    
+    small {
+      color: #0c5460;
+      font-family: monospace;
+      word-break: break-all;
+    }
+  }
+}
+
+// Reset field button styles
+.resonance-reset-field-button {
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  color: #6c757d;
+  cursor: pointer;
+  font-size: 0.8em;
+  transition: all 0.2s;
+  
+  &:hover:not(:disabled) {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    color: #495057;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }

@@ -360,8 +360,6 @@ def get_resonance_status(slave: int = 20):
 
     return response
 
-# Add this function to resonance_service.py, after the helper functions:
-
 def _update_firmware_with_external_result(best_overall_freq: int, slave: int = 20):
     """
     Write the externally obtained resonance frequency to firmware registers

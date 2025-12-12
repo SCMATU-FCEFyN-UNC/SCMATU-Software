@@ -5,15 +5,40 @@ import { useConnection } from "../../context/ConnectionStatusProvider";
 import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 
 const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [rangeStart, setRangeStart] = useState<number>(20000);
-  const [rangeEnd, setRangeEnd] = useState<number>(140000);
-  const [step, setStep] = useState<number>(10);
-  const [stabilizeS, setStabilizeS] = useState<number>(0.15);
-  const [mode, setMode] = useState<"firmware" | "software">("firmware");
+  // Initialize state from sessionStorage with defaults
+  const [rangeStart, setRangeStart] = useState<number>(() => {
+    const saved = sessionStorage.getItem("resonanceRangeStart");
+    return saved ? parseInt(saved, 10) : 20000;
+  });
+  const [rangeEnd, setRangeEnd] = useState<number>(() => {
+    const saved = sessionStorage.getItem("resonanceRangeEnd");
+    return saved ? parseInt(saved, 10) : 140000;
+  });
+  const [step, setStep] = useState<number>(() => {
+    const saved = sessionStorage.getItem("resonanceStep");
+    return saved ? parseInt(saved, 10) : 10;
+  });
+  const [stabilizeS, setStabilizeS] = useState<number>(() => {
+    const saved = sessionStorage.getItem("resonanceStabilizeS");
+    return saved ? parseFloat(saved) : 0.15;
+  });
+  const [mode, setMode] = useState<"firmware" | "software">(() => {
+    const saved = sessionStorage.getItem("resonanceMode");
+    return saved === "software" || saved === "firmware" ? saved : "firmware";
+  });
+
   const [message, setMessage] = useState<string | null>(null);
   const [firmwareUpdateStatus, setFirmwareUpdateStatus] = useState<
     string | null
   >(null);
+
+  // New state for save options
+  const [saveResults, setSaveResults] = useState<boolean>(false);
+  const [saveFolderPath, setSaveFolderPath] = useState<string | null>(() => {
+    // Initialize from sessionStorage if available
+    return sessionStorage.getItem("resonanceSaveFolderPath");
+  });
+  const [isSelectingFolder, setIsSelectingFolder] = useState<boolean>(false);
 
   // New state for obtained frequency results with all fields
   const [obtainedFrequencies, setObtainedFrequencies] = useState<{
@@ -45,6 +70,90 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { connected } = useConnection();
   const { running, setRunning, statusText, setStatusText } =
     useResonanceStatus();
+
+  // Save state to sessionStorage whenever values change
+  useEffect(() => {
+    sessionStorage.setItem("resonanceRangeStart", rangeStart.toString());
+  }, [rangeStart]);
+
+  useEffect(() => {
+    sessionStorage.setItem("resonanceRangeEnd", rangeEnd.toString());
+  }, [rangeEnd]);
+
+  useEffect(() => {
+    sessionStorage.setItem("resonanceStep", step.toString());
+  }, [step]);
+
+  useEffect(() => {
+    sessionStorage.setItem("resonanceStabilizeS", stabilizeS.toString());
+  }, [stabilizeS]);
+
+  useEffect(() => {
+    sessionStorage.setItem("resonanceMode", mode);
+  }, [mode]);
+
+  // Function to open folder selection dialog
+  const selectSaveFolder = async () => {
+    if (isSelectingFolder) return;
+
+    setIsSelectingFolder(true);
+    try {
+      const response = await makeRequest("/select-folder", {
+        method: "GET",
+      });
+
+      if (response.data && response.data.status === "success") {
+        const folderPath = response.data.folder;
+        setSaveFolderPath(folderPath);
+        setSaveResults(true);
+
+        // Store in sessionStorage for persistence during app session
+        sessionStorage.setItem("resonanceSaveFolderPath", folderPath);
+      } else {
+        // Only clear folder if user explicitly cancels and no folder was previously set
+        if (!saveFolderPath) {
+          setSaveFolderPath(null);
+          setSaveResults(false);
+        }
+        // If user cancels but we already have a folder, keep it
+        setMessage("❌ No folder selected. Keeping previous folder.");
+      }
+    } catch (err) {
+      console.error("Error selecting folder:", err);
+      // Don't clear existing folder on error
+      if (!saveFolderPath) {
+        setSaveFolderPath(null);
+        setSaveResults(false);
+      }
+      setMessage(
+        "❌ Error selecting folder. Keeping previous folder if available."
+      );
+    } finally {
+      setIsSelectingFolder(false);
+    }
+  };
+
+  // Clear saved folder when switching to firmware mode
+  const handleModeChangeToFirmware = () => {
+    setMode("firmware");
+    // Clear any previous software results when switching to firmware mode
+    setObtainedFrequencies({
+      best_overall: null,
+      best_phase: null,
+      best_current: null,
+    });
+    // Disable save results for firmware mode
+    setSaveResults(false);
+    // Don't clear folder path - keep it for next time
+    checkExistingResults();
+  };
+
+  // Initialize saveResults based on whether we have a saved folder
+  useEffect(() => {
+    if (mode === "software" && saveFolderPath) {
+      setSaveResults(true);
+    }
+  }, [mode, saveFolderPath]);
 
   // Function to extract results from status response (for BOTH firmware and software modes)
   const extractResultsFromStatus = (statusData: any) => {
@@ -186,6 +295,44 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   "✓ Firmware updated with resonance frequency"
                 );
               }, 1000);
+
+              // Save results to CSV if requested
+              if (saveResults && saveFolderPath && otherData.results) {
+                try {
+                  const saveResponse = await makeRequest(
+                    "/resonance/save-results",
+                    {
+                      method: "POST",
+                      data: {
+                        folder_path: saveFolderPath,
+                        results: otherData.results,
+                        best_overall: otherData.best_overall,
+                        best_phase: otherData.best_phase,
+                        best_current: otherData.best_current,
+                        sweep_params: {
+                          start: rangeStart,
+                          end: rangeEnd,
+                          step: step,
+                          stabilize_s: stabilizeS,
+                        },
+                      },
+                    }
+                  );
+
+                  if (saveResponse.data && saveResponse.data.success) {
+                    setMessage(
+                      (prev) =>
+                        prev +
+                        `\n📁 Results saved to: ${saveResponse.data.filename}`
+                    );
+                  }
+                } catch (saveErr) {
+                  console.error("Error saving results:", saveErr);
+                  setMessage(
+                    (prev) => prev + "\n❌ Failed to save results to CSV."
+                  );
+                }
+              }
             }
 
             setMessage(successMessage);
@@ -211,10 +358,18 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       checkExistingResults();
     }
     return () => clearInterval(interval);
-  }, [running, mode]);
+  }, [running, mode, saveResults, saveFolderPath]);
 
   async function handleStartMeasurement() {
     if (!connected || running) return;
+
+    // For software mode with save enabled, ensure folder is selected
+    if (mode === "software" && saveResults && !saveFolderPath) {
+      setMessage("⚠️ Please select a save folder first.");
+      // Don't auto-open folder selector - let user click the button
+      return;
+    }
+
     try {
       setMessage(null);
       setStatusText("Starting measurement...");
@@ -236,6 +391,8 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             frequency_range_end: rangeEnd,
             frequency_step: step,
             stabilize_s: stabilizeS,
+            save_results: saveResults, // Pass save preference to backend
+            save_folder_path: saveFolderPath, // Pass folder path if selected
           },
         });
 
@@ -312,43 +469,43 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       current: number | null;
     } | null
   ) => (
-    <div className="frequency-card">
+    <div className="resonance-frequency-card">
       <h4>{title}</h4>
-      <div className="frequency-grid-2x2">
-        <div className="frequency-field">
+      <div className="resonance-frequency-grid-2x2">
+        <div className="resonance-frequency-field">
           <label>Frequency:</label>
           <input
             type="text"
             value={formatFrequency(data?.frequency)}
             readOnly
-            className="readonly-field"
+            className="resonance-readonly-field"
           />
         </div>
-        <div className="frequency-field">
+        <div className="resonance-frequency-field">
           <label>Phase (ns):</label>
           <input
             type="text"
             value={formatPhaseNs(data?.phase_ns)}
             readOnly
-            className="readonly-field"
+            className="resonance-readonly-field"
           />
         </div>
-        <div className="frequency-field">
+        <div className="resonance-frequency-field">
           <label>Phase (deg):</label>
           <input
             type="text"
             value={formatPhaseDeg(data?.phase_deg)}
             readOnly
-            className="readonly-field"
+            className="resonance-readonly-field"
           />
         </div>
-        <div className="frequency-field">
+        <div className="resonance-frequency-field">
           <label>Current:</label>
           <input
             type="text"
             value={formatCurrent(data?.current)}
             readOnly
-            className="readonly-field"
+            className="resonance-readonly-field"
           />
         </div>
       </div>
@@ -360,64 +517,92 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       <div className="panel resonance-modal">
         <h2>Resonance Measurement</h2>
 
-        <div className="fieldGroup">
-          <label htmlFor="range-start">Frequency Range Start (Hz)</label>
+        <div className="resonance-field-group">
+          <label htmlFor="range-start" className="resonance-field-label">
+            Frequency Range Start (Hz)
+            <button
+              type="button"
+              className="resonance-reset-field-button"
+              onClick={() => setRangeStart(20000)}
+              title="Reset to default (20000)"
+              disabled={running}
+            >
+              ↺
+            </button>
+          </label>
           <input
             id="range-start"
             type="number"
             value={rangeStart}
             onChange={(e) => setRangeStart(Number(e.target.value))}
             disabled={running}
+            className="resonance-field-input"
           />
         </div>
 
-        <div className="fieldGroup">
-          <label htmlFor="range-end">Frequency Range End (Hz)</label>
+        <div className="resonance-field-group">
+          <label htmlFor="range-end" className="resonance-field-label">
+            Frequency Range End (Hz)
+            <button
+              type="button"
+              className="resonance-reset-field-button"
+              onClick={() => setRangeEnd(140000)}
+              title="Reset to default (140000)"
+              disabled={running}
+            >
+              ↺
+            </button>
+          </label>
           <input
             id="range-end"
             type="number"
             value={rangeEnd}
             onChange={(e) => setRangeEnd(Number(e.target.value))}
             disabled={running}
+            className="resonance-field-input"
           />
         </div>
 
-        <div className="fieldGroup">
-          <label htmlFor="step">Frequency Step (Hz)</label>
+        <div className="resonance-field-group">
+          <label htmlFor="step" className="resonance-field-label">
+            Frequency Step (Hz)
+            <button
+              type="button"
+              className="resonance-reset-field-button"
+              onClick={() => setStep(10)}
+              title="Reset to default (10)"
+              disabled={running}
+            >
+              ↺
+            </button>
+          </label>
           <input
             id="step"
             type="number"
             value={step}
             onChange={(e) => setStep(Number(e.target.value))}
             disabled={running}
+            className="resonance-field-input"
           />
         </div>
 
-        <fieldset className="fieldGroup">
+        <fieldset className="resonance-field-group">
           <legend>Measurement Mode</legend>
 
-          <label>
+          <label className="resonance-radio-label">
             <input
               type="radio"
               name="resonance-mode"
               value="firmware"
               checked={mode === "firmware"}
-              onChange={() => {
-                setMode("firmware");
-                // Clear any previous software results when switching to firmware mode
-                setObtainedFrequencies({
-                  best_overall: null,
-                  best_phase: null,
-                  best_current: null,
-                });
-                checkExistingResults();
-              }}
+              onChange={handleModeChangeToFirmware}
               disabled={running}
+              className="resonance-radio-input"
             />
             Firmware (device internal sweep)
           </label>
 
-          <label style={{ marginLeft: 12 }}>
+          <label className="resonance-radio-label" style={{ marginLeft: 12 }}>
             <input
               type="radio"
               name="resonance-mode"
@@ -428,42 +613,120 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 checkExistingResults();
               }}
               disabled={running}
+              className="resonance-radio-input"
             />
             Software (backend-driven sweep)
           </label>
         </fieldset>
 
         {mode === "software" && (
-          <div className="fieldGroup">
-            <label htmlFor="stabilize-s">
-              Stabilization delay per step (s)
-            </label>
-            <input
-              id="stabilize-s"
-              type="number"
-              step="0.01"
-              min="0"
-              value={stabilizeS}
-              onChange={(e) => setStabilizeS(Number(e.target.value))}
-              disabled={running}
-            />
-            <small>
-              Time to wait after setting frequency before reading (default
-              0.15s)
-            </small>
-          </div>
+          <>
+            <div className="resonance-field-group">
+              <label htmlFor="stabilize-s" className="resonance-field-label">
+                Stabilization delay per step (s)
+                <button
+                  type="button"
+                  className="resonance-reset-field-button"
+                  onClick={() => setStabilizeS(0.15)}
+                  title="Reset to default (0.15)"
+                  disabled={running}
+                >
+                  ↺
+                </button>
+              </label>
+              <input
+                id="stabilize-s"
+                type="number"
+                step="0.01"
+                min="0"
+                value={stabilizeS}
+                onChange={(e) => setStabilizeS(Number(e.target.value))}
+                disabled={running}
+                className="resonance-field-input"
+              />
+              <small className="resonance-field-hint">
+                Time to wait after setting frequency before reading (default
+                0.15s)
+              </small>
+            </div>
+
+            {/* Save Results Option */}
+            <div className="resonance-save-results-section">
+              <label className="resonance-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={saveResults}
+                  onChange={(e) => {
+                    const newSaveResults = e.target.checked;
+                    setSaveResults(newSaveResults);
+
+                    // If unchecking and we have a folder, keep it but don't save
+                    if (!newSaveResults) {
+                      // Keep folder path for next time
+                      setMessage(
+                        "⚠️ Save disabled but folder will be remembered."
+                      );
+                    } else if (newSaveResults && !saveFolderPath) {
+                      // If checking without a folder, show warning but don't auto-open
+                      setMessage(
+                        "⚠️ Please select a save folder by clicking the button below."
+                      );
+                    }
+                  }}
+                  disabled={running}
+                  className="resonance-checkbox-input"
+                />
+                <span>Save sweep results to CSV file</span>
+              </label>
+
+              {saveResults && (
+                <div className="resonance-save-folder-section">
+                  <button
+                    type="button"
+                    onClick={selectSaveFolder}
+                    disabled={running || isSelectingFolder}
+                    className="resonance-folder-select-button"
+                  >
+                    {isSelectingFolder
+                      ? "Selecting..."
+                      : saveFolderPath
+                      ? "Change Save Folder"
+                      : "Select Save Folder"}
+                  </button>
+
+                  {/* Always show folder path when we have one, regardless of checkbox state */}
+                  {saveFolderPath ? (
+                    <div className="resonance-folder-path-display">
+                      <small>Folder: {saveFolderPath}</small>
+                    </div>
+                  ) : (
+                    <div className="resonance-folder-path-warning">
+                      <small>⚠️ Please select a folder to save results</small>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Show folder info even when checkbox is unchecked but we have a folder */}
+              {!saveResults && saveFolderPath && (
+                <div className="resonance-folder-path-info">
+                  <small>📁 Folder saved for next time: {saveFolderPath}</small>
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* Obtained Frequencies Section */}
-        <div className="obtained-frequencies-section">
+        <div className="resonance-obtained-frequencies-section">
           <h3>Obtained Resonance Frequencies</h3>
-          <p className="mode-indicator">
+          <p className="resonance-mode-indicator">
             <small>
               Mode: {mode === "firmware" ? "Firmware-based" : "Software-based"}
             </small>
           </p>
 
-          <div className="frequency-cards-grid">
+          <div className="resonance-frequency-cards-grid">
             {renderFrequencyCard(
               "Best Overall",
               obtainedFrequencies.best_overall
@@ -476,25 +739,30 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         </div>
 
-        <div className="status-section">
+        <div className="resonance-status-section">
           <p>
             <strong>Status:</strong> {statusText}
           </p>
           {running && (
-            <div className="loading-indicator">
-              <div className="spinner" data-testid="loading-spinner" />
+            <div className="resonance-loading-indicator">
+              <div
+                className="resonance-spinner"
+                data-testid="loading-spinner"
+              />
               <p>This process may take several minutes. Please wait...</p>
             </div>
           )}
         </div>
 
-        {message && <p className="message">{message}</p>}
+        {message && <p className="resonance-message">{message}</p>}
 
         {/* Add firmware update status display here */}
         {firmwareUpdateStatus && (
           <p
-            className={`firmware-update-status ${
-              firmwareUpdateStatus.includes("✓") ? "success" : "info"
+            className={`resonance-firmware-update-status ${
+              firmwareUpdateStatus.includes("✓")
+                ? "resonance-status-success"
+                : "resonance-status-info"
             }`}
           >
             {firmwareUpdateStatus}
@@ -504,7 +772,14 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <div className="buttons">
           <button
             onClick={handleStartMeasurement}
-            disabled={!connected || running}
+            disabled={
+              !connected ||
+              running ||
+              (mode === "software" &&
+                saveResults &&
+                !saveFolderPath &&
+                !isSelectingFolder)
+            }
           >
             Start Measurement
           </button>
