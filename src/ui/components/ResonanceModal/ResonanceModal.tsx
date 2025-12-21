@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./ResonanceModal.model.scss";
 import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
@@ -27,6 +27,16 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     return saved === "software" || saved === "firmware" ? saved : "firmware";
   });
 
+  // New state for plot options
+  const [livePlot, setLivePlot] = useState<boolean>(() => {
+    const saved = sessionStorage.getItem("resonanceLivePlot");
+    return saved ? JSON.parse(saved) : true; // Default to true (show plot)
+  });
+  const [savePlot, setSavePlot] = useState<boolean>(() => {
+    const saved = sessionStorage.getItem("resonanceSavePlot");
+    return saved ? JSON.parse(saved) : false; // Default to false
+  });
+
   const [message, setMessage] = useState<string | null>(null);
   const [firmwareUpdateStatus, setFirmwareUpdateStatus] = useState<
     string | null
@@ -39,6 +49,12 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     return sessionStorage.getItem("resonanceSaveFolderPath");
   });
   const [isSelectingFolder, setIsSelectingFolder] = useState<boolean>(false);
+
+  const [plotOpen, setPlotOpen] = useState<boolean>(false);
+  const resultsSavedRef = useRef<boolean>(false);
+  const plotSavedRef = useRef<boolean>(false);
+  const firmwareUpdatedRef = useRef<boolean>(false);
+  const measurementCompletedRef = useRef<boolean>(false);
 
   // New state for obtained frequency results with all fields
   const [obtainedFrequencies, setObtainedFrequencies] = useState<{
@@ -92,6 +108,15 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     sessionStorage.setItem("resonanceMode", mode);
   }, [mode]);
 
+  // Save plot options to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem("resonanceLivePlot", JSON.stringify(livePlot));
+  }, [livePlot]);
+
+  useEffect(() => {
+    sessionStorage.setItem("resonanceSavePlot", JSON.stringify(savePlot));
+  }, [savePlot]);
+
   // Function to open folder selection dialog
   const selectSaveFolder = async () => {
     if (isSelectingFolder) return;
@@ -142,8 +167,10 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       best_phase: null,
       best_current: null,
     });
-    // Disable save results for firmware mode
+    // Disable save results and plot options for firmware mode
     setSaveResults(false);
+    setLivePlot(false);
+    setSavePlot(false);
     // Don't clear folder path - keep it for next time
     checkExistingResults();
   };
@@ -154,6 +181,16 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       setSaveResults(true);
     }
   }, [mode, saveFolderPath]);
+
+  // Initialize plot options when switching to software mode
+  useEffect(() => {
+    if (mode === "software") {
+      // Enable live plot by default for software mode
+      if (sessionStorage.getItem("resonanceLivePlot") === null) {
+        setLivePlot(true);
+      }
+    }
+  }, [mode]);
 
   // Function to extract results from status response (for BOTH firmware and software modes)
   const extractResultsFromStatus = (statusData: any) => {
@@ -260,7 +297,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   // Polling for status and update obtained frequencies when measurement completes
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (running) {
+    if (running || plotOpen) {
       // Clear firmware update status when starting new measurement
       setFirmwareUpdateStatus(null);
 
@@ -269,84 +306,129 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           const res = await makeRequest("/resonance/status", { method: "GET" });
           const { status_code, status_text, ...otherData } = res.data;
           setStatusText(status_text);
+          setPlotOpen(otherData.plot_open || false);
+
+          // Stop polling if measurement is done and plot is closed
+          if (!running && !(otherData.plot_open || false)) {
+            clearInterval(interval);
+          }
 
           // Extract results if available in the response (for BOTH modes now)
           extractResultsFromStatus(otherData);
 
           if (status_code === 1 || status_code === 2) {
-            setRunning(false);
-            clearInterval(interval);
+            if (!measurementCompletedRef.current) {
+              setRunning(false);
 
-            const successMessage =
-              status_code === 1
-                ? "✅ Resonance frequency obtained successfully!"
-                : "❌ Failed to obtain resonance frequency.";
+              const successMessage =
+                status_code === 1
+                  ? "✅ Resonance frequency obtained successfully!"
+                  : "❌ Failed to obtain resonance frequency.";
 
-            // Add firmware update info for software mode
-            if (status_code === 1 && mode === "software") {
-              setFirmwareUpdateStatus(
-                "Updating firmware with resonance frequency..."
-              );
-
-              // The backend should have already updated the firmware automatically
-              // but we can display a confirmation message after a delay
-              setTimeout(() => {
-                setFirmwareUpdateStatus(
-                  "✓ Firmware updated with resonance frequency"
-                );
-              }, 1000);
-
-              // Save results to CSV if requested
-              if (saveResults && saveFolderPath && otherData.results) {
-                try {
-                  const saveResponse = await makeRequest(
-                    "/resonance/save-results",
-                    {
-                      method: "POST",
-                      data: {
-                        folder_path: saveFolderPath,
-                        results: otherData.results,
-                        best_overall: otherData.best_overall,
-                        best_phase: otherData.best_phase,
-                        best_current: otherData.best_current,
-                        sweep_params: {
-                          start: rangeStart,
-                          end: rangeEnd,
-                          step: step,
-                          stabilize_s: stabilizeS,
-                        },
-                      },
-                    }
-                  );
-
-                  if (saveResponse.data && saveResponse.data.success) {
-                    setMessage(
-                      (prev) =>
-                        prev +
-                        `\n📁 Results saved to: ${saveResponse.data.filename}`
-                    );
-                  }
-                } catch (saveErr) {
-                  console.error("Error saving results:", saveErr);
-                  setMessage(
-                    (prev) => prev + "\n❌ Failed to save results to CSV."
+              // Add plot information for software mode
+              if (status_code === 1 && mode === "software") {
+                if (livePlot) {
+                  setMessage((prev) =>
+                    prev
+                      ? prev +
+                        "\n📊 Plot window is open. Close it manually when done."
+                      : "📊 Plot window is open. Close it manually when done."
                   );
                 }
-              }
-            }
 
-            setMessage(successMessage);
+                if (
+                  savePlot &&
+                  otherData.plot_filepath &&
+                  !plotSavedRef.current
+                ) {
+                  setMessage((prev) =>
+                    prev
+                      ? prev + `\n🖼️ Plot saved to: ${otherData.plot_filepath}`
+                      : `🖼️ Plot saved to: ${otherData.plot_filepath}`
+                  );
+                  plotSavedRef.current = true;
+                }
 
-            // For firmware mode, make sure we have the latest results
-            if (status_code === 1 && mode === "firmware") {
-              // Results should already be extracted above, but double-check
-              const hasResults = extractResultsFromStatus(otherData);
-              if (!hasResults) {
-                // If no results in immediate response, check again after a short delay
-                setTimeout(() => {
-                  checkExistingResults();
-                }, 1000);
+                // Add firmware update info
+                if (!firmwareUpdatedRef.current) {
+                  setFirmwareUpdateStatus(
+                    "Updating firmware with resonance frequency..."
+                  );
+
+                  // The backend should have already updated the firmware automatically
+                  // but we can display a confirmation message after a delay
+                  setTimeout(() => {
+                    setFirmwareUpdateStatus(
+                      "✓ Firmware updated with resonance frequency"
+                    );
+                  }, 1000);
+                  firmwareUpdatedRef.current = true;
+                }
+
+                // Save results to CSV if requested
+                if (
+                  saveResults &&
+                  saveFolderPath &&
+                  otherData.results &&
+                  !resultsSavedRef.current
+                ) {
+                  try {
+                    const saveResponse = await makeRequest(
+                      "/resonance/save-results",
+                      {
+                        method: "POST",
+                        data: {
+                          folder_path: saveFolderPath,
+                          results: otherData.results,
+                          best_overall: otherData.best_overall,
+                          best_phase: otherData.best_phase,
+                          best_current: otherData.best_current,
+                          plot_filepath: otherData.plot_filepath,
+                          sweep_params: {
+                            start: rangeStart,
+                            end: rangeEnd,
+                            step: step,
+                            stabilize_s: stabilizeS,
+                            live_plot: livePlot,
+                            save_plot: savePlot,
+                          },
+                        },
+                      }
+                    );
+
+                    if (saveResponse.data && saveResponse.data.success) {
+                      setMessage(
+                        (prev) =>
+                          prev +
+                          `\n📁 Results saved to: ${saveResponse.data.filename}`
+                      );
+                    }
+                  } catch (saveErr) {
+                    console.error("Error saving results:", saveErr);
+                    setMessage(
+                      (prev) => prev + "\n❌ Failed to save results to CSV."
+                    );
+                  }
+                  resultsSavedRef.current = true;
+                }
               }
+
+              setMessage((prev) =>
+                prev ? prev + "\n" + successMessage : successMessage
+              );
+
+              // For firmware mode, make sure we have the latest results
+              if (status_code === 1 && mode === "firmware") {
+                // Results should already be extracted above, but double-check
+                const hasResults = extractResultsFromStatus(otherData);
+                if (!hasResults) {
+                  // If no results in immediate response, check again after a short delay
+                  setTimeout(() => {
+                    checkExistingResults();
+                  }, 1000);
+                }
+              }
+              measurementCompletedRef.current = true;
             }
           }
         } catch (err) {
@@ -355,13 +437,23 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       }, 3000);
     } else {
       // On initial load, check for existing results
-      checkExistingResults();
+      if (!running && !plotOpen) {
+        checkExistingResults();
+      }
     }
     return () => clearInterval(interval);
-  }, [running, mode, saveResults, saveFolderPath]);
+  }, [
+    running,
+    plotOpen,
+    mode,
+    saveResults,
+    saveFolderPath,
+    livePlot,
+    savePlot,
+  ]);
 
   async function handleStartMeasurement() {
-    if (!connected || running) return;
+    if (!connected || running || plotOpen) return;
 
     // For software mode with save enabled, ensure folder is selected
     if (mode === "software" && saveResults && !saveFolderPath) {
@@ -370,10 +462,20 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       return;
     }
 
+    // For software mode with save plot enabled, ensure folder is selected
+    if (mode === "software" && savePlot && !saveFolderPath) {
+      setMessage("⚠️ Please select a save folder to save the plot.");
+      return;
+    }
+
     try {
       setMessage(null);
       setStatusText("Starting measurement...");
       setRunning(true);
+      resultsSavedRef.current = false;
+      plotSavedRef.current = false;
+      firmwareUpdatedRef.current = false;
+      measurementCompletedRef.current = false;
       // Clear previous results
       setObtainedFrequencies({
         best_overall: null,
@@ -393,11 +495,17 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             stabilize_s: stabilizeS,
             save_results: saveResults, // Pass save preference to backend
             save_folder_path: saveFolderPath, // Pass folder path if selected
+            live_plot: livePlot, // Pass live plot preference
+            save_plot: savePlot, // Pass save plot preference
           },
         });
 
         if (response.data && response.data.success) {
           setStatusText("Measurement in progress...");
+          // Show message about plot if enabled
+          if (livePlot) {
+            setMessage("📊 Live plot will open in a separate window...");
+          }
           // polling effect will handle completion messages and results
         } else {
           setStatusText("Error starting measurement");
@@ -650,9 +758,63 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </small>
             </div>
 
-            {/* Save Results Option */}
-            <div className="resonance-save-results-section">
+            {/* Plot Options Section */}
+            <div className="resonance-plot-options-section">
+              <h4>Plot Options</h4>
+
               <label className="resonance-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={livePlot}
+                  onChange={(e) => setLivePlot(e.target.checked)}
+                  disabled={running}
+                  className="resonance-checkbox-input"
+                />
+                <span>Show live plot during measurement</span>
+              </label>
+
+              <small className="resonance-field-hint">
+                When enabled, a live plot window will open showing phase and
+                current vs frequency
+              </small>
+            </div>
+
+            {/* Save Results Config Section */}
+            <div className="resonance-save-results-config-section">
+              <h4>Save Results Config</h4>
+
+              <div className="resonance-save-folder-section">
+                <button
+                  type="button"
+                  onClick={selectSaveFolder}
+                  disabled={running || isSelectingFolder}
+                  className="resonance-folder-select-button"
+                >
+                  {isSelectingFolder
+                    ? "Selecting..."
+                    : saveFolderPath
+                    ? "Change Save Folder"
+                    : "Select Save Folder"}
+                </button>
+
+                {/* Always show folder path when we have one, regardless of checkbox state */}
+                {saveFolderPath ? (
+                  <div className="resonance-folder-path-display">
+                    <small>Folder: {saveFolderPath}</small>
+                  </div>
+                ) : (
+                  <div className="resonance-folder-path-warning">
+                    <small>
+                      ⚠️ Please select a folder to save results/plots
+                    </small>
+                  </div>
+                )}
+              </div>
+
+              <label
+                className="resonance-checkbox-label"
+                style={{ marginTop: "15px" }}
+              >
                 <input
                   type="checkbox"
                   checked={saveResults}
@@ -669,7 +831,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     } else if (newSaveResults && !saveFolderPath) {
                       // If checking without a folder, show warning but don't auto-open
                       setMessage(
-                        "⚠️ Please select a save folder by clicking the button below."
+                        "⚠️ Please select a save folder by clicking the button above."
                       );
                     }
                   }}
@@ -679,37 +841,41 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <span>Save sweep results to CSV file</span>
               </label>
 
-              {saveResults && (
-                <div className="resonance-save-folder-section">
-                  <button
-                    type="button"
-                    onClick={selectSaveFolder}
-                    disabled={running || isSelectingFolder}
-                    className="resonance-folder-select-button"
-                  >
-                    {isSelectingFolder
-                      ? "Selecting..."
-                      : saveFolderPath
-                      ? "Change Save Folder"
-                      : "Select Save Folder"}
-                  </button>
+              <label
+                className="resonance-checkbox-label"
+                style={{ marginTop: "10px" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={savePlot}
+                  onChange={(e) => {
+                    const newSavePlot = e.target.checked;
+                    setSavePlot(newSavePlot);
 
-                  {/* Always show folder path when we have one, regardless of checkbox state */}
-                  {saveFolderPath ? (
-                    <div className="resonance-folder-path-display">
-                      <small>Folder: {saveFolderPath}</small>
-                    </div>
-                  ) : (
-                    <div className="resonance-folder-path-warning">
-                      <small>⚠️ Please select a folder to save results</small>
-                    </div>
-                  )}
-                </div>
-              )}
+                    // If enabling save plot but no folder is selected
+                    if (newSavePlot && !saveFolderPath) {
+                      setMessage(
+                        "⚠️ Please select a save folder to save the plot."
+                      );
+                    }
+                  }}
+                  disabled={running || !livePlot}
+                  className="resonance-checkbox-input"
+                />
+                <span>Save plot as PNG image</span>
+              </label>
 
-              {/* Show folder info even when checkbox is unchecked but we have a folder */}
-              {!saveResults && saveFolderPath && (
-                <div className="resonance-folder-path-info">
+              <small className="resonance-field-hint">
+                Requires "Show live plot" to be enabled and a save folder
+                selected
+              </small>
+
+              {/* Show folder info even when checkboxes are unchecked but we have a folder */}
+              {!saveResults && !savePlot && saveFolderPath && (
+                <div
+                  className="resonance-folder-path-info"
+                  style={{ marginTop: "10px" }}
+                >
                   <small>📁 Folder saved for next time: {saveFolderPath}</small>
                 </div>
               )}
@@ -752,6 +918,11 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <p>This process may take several minutes. Please wait...</p>
             </div>
           )}
+          {plotOpen && (
+            <p className="resonance-plot-open-message">
+              📊 Plot window is open. Close it to start a new measurement.
+            </p>
+          )}
         </div>
 
         {message && <p className="resonance-message">{message}</p>}
@@ -775,15 +946,16 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             disabled={
               !connected ||
               running ||
+              plotOpen ||
               (mode === "software" &&
-                saveResults &&
-                !saveFolderPath &&
+                ((saveResults && !saveFolderPath) ||
+                  (savePlot && !saveFolderPath)) &&
                 !isSelectingFolder)
             }
           >
             Start Measurement
           </button>
-          <button onClick={onClose} disabled={running}>
+          <button onClick={onClose} disabled={running || plotOpen}>
             Close
           </button>
         </div>

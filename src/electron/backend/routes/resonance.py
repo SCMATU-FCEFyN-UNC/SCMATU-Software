@@ -96,7 +96,9 @@ def start_resonance_measurement_endpoint():
         "frequency_step": 10,
         "stabilize_s": 0.15,
         "save_results": false,        # optional: whether to save CSV
-        "save_folder_path": null      # optional: folder path for CSV
+        "save_folder_path": null,     # optional: folder path for CSV
+        "live_plot": true,            # optional: show live plot (default: true)
+        "save_plot": false            # optional: save plot as PNG (default: false)
       }
     """
     try:
@@ -111,12 +113,22 @@ def start_resonance_measurement_endpoint():
             stabilize_s = float(data.get("stabilize_s", 0.15))
             save_results = data.get("save_results", False)
             save_folder_path = data.get("save_folder_path")
+            live_plot = data.get("live_plot", True)  # Default to showing plot
+            save_plot = data.get("save_plot", False)  # Default to not saving plot
             
             print(f"Starting software sweep: {start_hz}-{end_hz} Hz, step {step_hz}", flush=True)
             if save_results and save_folder_path:
                 print(f"Results will be saved to: {save_folder_path}", flush=True)
+            if live_plot:
+                print("Live plot will be displayed", flush=True)
+            if save_plot and save_folder_path:
+                print(f"Plot will be saved to: {save_folder_path}", flush=True)
             
-            res = start_software_sweep(start_hz, end_hz, step_hz, stabilize_s, slave=20)
+            res = start_software_sweep(
+                start_hz, end_hz, step_hz, stabilize_s, slave=20,
+                save_results=save_results, save_folder_path=save_folder_path,
+                live_plot=live_plot, save_plot=save_plot
+            )
             return jsonify(res), 200
         else:
             # firmware default behavior
@@ -205,7 +217,9 @@ def save_results_to_csv():
                 f.write(f"  Start Frequency: {sweep_params.get('start', 'N/A')} Hz\n")
                 f.write(f"  End Frequency: {sweep_params.get('end', 'N/A')} Hz\n")
                 f.write(f"  Step: {sweep_params.get('step', 'N/A')} Hz\n")
-                f.write(f"  Stabilization Delay: {sweep_params.get('stabilize_s', 'N/A')} s\n\n")
+                f.write(f"  Stabilization Delay: {sweep_params.get('stabilize_s', 'N/A')} s\n")
+                f.write(f"  Live Plot: {'Enabled' if sweep_params.get('live_plot', True) else 'Disabled'}\n")
+                f.write(f"  Save Plot: {'Enabled' if sweep_params.get('save_plot', False) else 'Disabled'}\n\n")
             
             # Helper function to get current value handling both field names
             def get_current_value(result):
@@ -241,6 +255,11 @@ def save_results_to_csv():
                 f.write(f"  Phase (ns): {best_current.get('phase_ns', 'N/A')}\n")
                 f.write(f"  Phase (deg): {best_current.get('phase_deg', 'N/A')}\n")
                 f.write(f"  Current: {get_current_value(best_current)} A\n")
+            
+            # Include plot filepath if available
+            plot_filepath = data.get("plot_filepath")
+            if plot_filepath:
+                f.write(f"\nPlot saved to: {plot_filepath}\n")
         
         print(f"Results saved to: {filepath}", flush=True)
         print(f"Summary saved to: {summary_filepath}", flush=True)

@@ -13,7 +13,7 @@
   background: #fff;
   border-radius: 16px;
   padding: 24px;
-  width: 550px; // Slightly wider for 2×2 grid
+  width: 600px; // Slightly wider for plot options
   max-height: 85vh;
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -94,6 +94,51 @@
       color: #666;
       font-size: 0.85em;
       margin-top: 4px;
+    }
+  }
+
+  // Plot Options Section
+  .resonance-plot-options-section {
+    margin: 15px 0;
+    padding: 15px;
+    background-color: #f0f8ff;
+    border-radius: 8px;
+    border: 1px solid #cce7ff;
+    
+    h4 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: #0056b3;
+      font-size: 1em;
+      border-bottom: 1px solid #cce7ff;
+      padding-bottom: 8px;
+    }
+    
+    .resonance-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      
+      .resonance-checkbox-input {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+      
+      span {
+        font-weight: 500;
+        color: #495057;
+      }
+    }
+    
+    .resonance-field-hint {
+      color: #666;
+      font-size: 0.85em;
+      margin-top: 4px;
+      display: block;
+      margin-left: 24px;
     }
   }
 
@@ -227,6 +272,7 @@
     border-radius: 6px;
     font-size: 0.95em;
     text-align: center;
+    white-space: pre-line;
     
     /* Success message */
     &:contains("✅") {
@@ -240,6 +286,20 @@
       background-color: #f8d7da;
       color: #721c24;
       border: 1px solid #f5c6cb;
+    }
+    
+    /* Info message */
+    &:contains("⚠️") {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    
+    /* Plot message */
+    &:contains("📊") {
+      background-color: #e7f3ff;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
     }
   }
 
@@ -322,20 +382,20 @@
   font-size: 0.95em;
   text-align: center;
   
-  &.info {
+  &.resonance-status-info {
     background-color: #e7f3ff;
     color: #0c5460;
     border: 1px solid #bee5eb;
   }
   
-  &.success {
+  &.resonance-status-success {
     background-color: #d4edda;
     color: #155724;
     border: 1px solid #c3e6cb;
   }
 }
 
-.resonance-save-results-section {
+.resonance-save-results-config-section {
   padding: 12px;
   background-color: #f8f9fa;
   border-radius: 6px;
