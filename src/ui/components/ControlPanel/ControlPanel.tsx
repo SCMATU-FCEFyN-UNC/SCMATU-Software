@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./ControlPanel.model.scss";
 import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
@@ -13,12 +13,23 @@ const ControlPanel: React.FC = () => {
   const [onTime, setOnTime] = useState<number>(100);
   const [offTime, setOffTime] = useState<number>(100);
 
+  // Closed loop control state (migrated from DeviceDataPanel)
+  const [closedLoopControlEnabled, setClosedLoopControlEnabled] =
+    useState<boolean>(false);
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const { makeRequest } = useBackendRequest();
   const { connected } = useConnection();
   const { running } = useResonanceStatus();
+
+  useEffect(() => {
+    if (connected) {
+      // Fetch initial closed loop state when connected
+      handleGetClosedLoopControlEnabled(false);
+    }
+  }, [connected]);
 
   // Helper to check if interactions should be disabled
   const isDisabled = !connected || loading || running;
@@ -87,6 +98,48 @@ const ControlPanel: React.FC = () => {
       "Off time updated"
     );
   }
+
+  // Closed Loop Control Functions (migrated from DeviceDataPanel)
+  const handleGetClosedLoopControlEnabled = async (showMessage = true) => {
+    try {
+      setLoading(true);
+      const resp = await makeRequest("/closed_loop_control", { method: "GET" });
+      if (resp.data?.success) {
+        setClosedLoopControlEnabled(Boolean(resp.data.closed_loop_enabled));
+        if (showMessage) setMessage("✅ Closed loop enabled state fetched");
+      } else {
+        if (showMessage) setMessage(`❌ ${resp.data.error || "Failed"}`);
+      }
+    } catch (err) {
+      console.error("Failed to get closed loop state:", err);
+      if (showMessage) setMessage("❌ Request failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleClosedLoopControl = async () => {
+    try {
+      setLoading(true);
+      setMessage(null);
+      const target = !closedLoopControlEnabled;
+      const response = await makeRequest("/closed_loop_control", {
+        method: "POST",
+        data: { enabled: target },
+      });
+      if (response.data.success) {
+        setClosedLoopControlEnabled(target);
+        setMessage(`✅ Closed loop control ${target ? "enabled" : "disabled"}`);
+      } else {
+        setMessage(`❌ ${response.data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Request failed:", err);
+      setMessage("❌ Request failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   async function handleRequest(
     endpoint: string,
@@ -192,6 +245,32 @@ const ControlPanel: React.FC = () => {
         <button onClick={handleSetOffTime} disabled={isDisabled}>
           Set
         </button>
+      </div>
+
+      {/* Closed Loop Control (migrated from DeviceDataPanel) */}
+      <div className="fieldGroup">
+        <label>Closed Loop Control</label>
+        <div
+          className="closed-loop-row"
+          style={{ display: "flex", alignItems: "center", gap: "8px" }}
+        >
+          <span>{closedLoopControlEnabled ? "Enabled" : "Disabled"}</span>
+          <button
+            onClick={handleToggleClosedLoopControl}
+            disabled={isDisabled}
+            style={{ marginRight: "8px" }}
+          >
+            {closedLoopControlEnabled
+              ? "Disable Closed Loop"
+              : "Enable Closed Loop"}
+          </button>
+          <button
+            onClick={() => handleGetClosedLoopControlEnabled()}
+            disabled={isDisabled}
+          >
+            Update
+          </button>
+        </div>
       </div>
 
       {!connected && <p className="warning">⚠️ Connect to a device first</p>}

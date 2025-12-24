@@ -1,4 +1,5 @@
-/* ui/components/CommunicationPanel/CommunicationPanel.model.scss */
+@use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
 
 .communication-panel {
   display: flex;
@@ -6,59 +7,157 @@
   gap: 1rem;
   padding: 1rem;
   background: #f9f9f9;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  max-width: 500px;
-
-  h2 {
-    margin: 0;
-    font-size: 1.4rem;
-    font-weight: bold;
-  }
-
-  .form-row {
-    display: flex;
+  .communication-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    justify-content: center;
+    align-items: center;
     gap: 0.5rem;
-    flex-wrap: wrap;
+    @include m.desktop_size {
+      height: 6.5rem;
+    }
 
-    label {
+    .communication-title{
+      width: 100%;
       display: flex;
       flex-direction: column;
-      font-size: 0.9rem;
+      align-items: center;
+      justify-content: center;
+      h2 {
+      margin: 0;
+      padding: 0;
+      font-size: 2.5rem;
+      font-weight: bold; 
+      }
+    
+    }
+    .communication-status {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
     }
 
-    select,
-    input,
-    button {
-      padding: 0.3rem 0.5rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-
-    button {
+    .communication-toggle {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
       cursor: pointer;
-      background-color: #007acc;
-      color: white;
-      transition: background 0.2s;
+    }
 
-      &:disabled {
-        background-color: #aaa;
-        cursor: not-allowed;
+    @include m.desktop_size {
+      grid-template-columns: 1.6fr 1fr 0.32fr;
+      grid-template-rows: none;
+      column-gap: 1rem;
+      .communication-status {
+        justify-content: flex-start;
+        margin-left: 1rem;
       }
+    }
+  
+  }
 
-      &:hover:not(:disabled) {
-        background-color: #005fa3;
+  .communication-content {
+    @include m.desktop_size {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      border: 1px solid #ddd;
+      border-top: none;
+    }
+    background: #f9f9f9;
+    
+    border-radius: 0 0 12px 12px;
+  }
+
+  .communication-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    align-items: center;
+    justify-content: center;
+    .port-selection {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem; 
+      @include m.desktopXL_size {
+        display: grid;
+        grid-template-columns: 1fr 0.1fr 2.2fr;
+        column-gap: 0.5rem;
+      }
+      width: 95%;
+      align-items: center;
+      justify-content: center;
+      .port-button, .port-label, .port-select {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        align-items: center;
+        justify-content: center;
+        select {
+          width: 100%;
+        }
+        
+      }
+      .port-label
+      {
+        align-items: flex-end;
       }
     }
   }
 
-  .status {
-    font-weight: bold;
-    &.connected {
-      color: green;
+  .communication-fields{
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    @include m.desktopXL_size {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
     }
-    &.disconnected {
-      color: red;
-    }
+    width: 95%;
   }
+
+
+  .communication-field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .connection-button-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .connection-button {
+    width: 30%;
+    font-size: 1.7rem;
+  }
+
 }
+
+.arrow {
+    margin-left: 10px;
+    border: solid #333;
+    border-width: 0 2px 2px 0;
+    display: inline-block;
+    padding: 3px;
+    cursor: pointer;
+    transform: rotate(45deg);
+  }
+
+  .arrow.down {
+    transform: rotate(45deg);
+  }
+
+  .arrow.up {
+    transform: rotate(-135deg);
+  }
+

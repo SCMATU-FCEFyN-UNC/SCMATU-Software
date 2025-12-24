@@ -18,6 +18,7 @@ const CommunicationPanel: React.FC = () => {
   const [bytesize, setBytesize] = useState(8);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   const { makeRequest } = useBackendRequest();
   const { connected, setConnected, selectedPort, setSelectedPort } =
@@ -123,94 +124,125 @@ const CommunicationPanel: React.FC = () => {
   }, [ports, connected, selectedPort]);
 
   return (
-    <div className="communication-panel">
-      <h2>Communication Setup</h2>
-
-      <div className="form-row">
-        <button onClick={handleFetchPorts} disabled={loading}>
-          {loading ? "Loading..." : "Check Available Ports"}
-        </button>
-
-        <label htmlFor="port-select">Port:</label>
-        <select
-          id="port-select"
-          disabled={(ports?.length ?? 0) === 0 || connected || loading} // ✅ safe check
-          value={selectedPort}
-          onChange={(e) => setSelectedPort(e.target.value)}
+    <div className="communication-panel" style={{ position: "relative" }}>
+      <div className="communication-header">
+        <div className="communication-title">
+          <h2>Communication Panel</h2>
+        </div>
+        <div className="communication-status">
+          <label>Status:</label>
+          {errorMessage && <p className="status error">⚠️ {errorMessage}</p>}
+          {connected && (
+            <p className="status connected">✅ Connected to {selectedPort}</p>
+          )}
+          {!connected && !errorMessage && (
+            <p className="status disconnected">🔌 Not connected</p>
+          )}
+        </div>
+        <div
+          className="communication-toggle"
+          onClick={() => setIsCollapsed(!isCollapsed)}
         >
-          <option value="">Select a Port</option>
-          {ports.map((p) => (
-            <option key={p.device} value={p.device}>
-              {p.device} - {p.description}
-            </option>
-          ))}
-        </select>
+          <span className={`arrow ${isCollapsed ? "down" : "up"}`}></span>
+        </div>
       </div>
 
-      <div className="form-row">
-        <label>
-          Baudrate:
-          <input
-            type="number"
-            value={baudrate}
-            disabled={connected || loading}
-            onChange={(e) => setBaudrate(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          Parity:
-          <select
-            value={parity}
-            disabled={connected || loading}
-            onChange={(e) => setParity(e.target.value)}
-          >
-            <option value="N">None</option>
-            <option value="E">Even</option>
-            <option value="O">Odd</option>
-          </select>
-        </label>
-        <label>
-          Stop Bits:
-          <input
-            type="number"
-            value={stopbits}
-            min={1}
-            max={2}
-            disabled={connected || loading}
-            onChange={(e) => setStopbits(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          Byte Size:
-          <input
-            type="number"
-            value={bytesize}
-            min={5}
-            max={8}
-            disabled={connected || loading}
-            onChange={(e) => setBytesize(Number(e.target.value))}
-          />
-        </label>
-      </div>
+      {!isCollapsed && (
+        <div className="communication-content">
+          <div className="communication-container">
+            <div className="port-selection">
+              <div className="port-button">
+                <button onClick={handleFetchPorts} disabled={loading}>
+                  {loading ? "Loading..." : "Check Available Ports"}
+                </button>
+              </div>
+              <div className="port-label">
+                <label htmlFor="port-select">Port:</label>
+              </div>
+              <div className="port-select">
+                <select
+                  id="port-select"
+                  disabled={(ports?.length ?? 0) === 0 || connected || loading} // ✅ safe check
+                  value={selectedPort}
+                  onChange={(e) => setSelectedPort(e.target.value)}
+                >
+                  <option value="">Select a Port</option>
+                  {ports.map((p) => (
+                    <option key={p.device} value={p.device}>
+                      {p.device} - {p.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-      <div className="form-row">
-        {!connected ? (
-          <button onClick={handleConnect} disabled={!selectedPort || loading}>
-            {loading ? "Connecting..." : "Connect"}
-          </button>
-        ) : (
-          <button onClick={handleDisconnect} disabled={loading || running}>
-            {loading ? "Disconnecting..." : "Disconnect"}
-          </button>
-        )}
-      </div>
+            <div className="communication-fields">
+              <div className="communication-field">
+                <label>Baudrate:</label>
+                <input
+                  type="number"
+                  value={baudrate}
+                  disabled={connected || loading}
+                  onChange={(e) => setBaudrate(Number(e.target.value))}
+                />
+              </div>
+              <div className="communication-field">
+                <label>Parity:</label>
+                <select
+                  value={parity}
+                  disabled={connected || loading}
+                  onChange={(e) => setParity(e.target.value)}
+                >
+                  <option value="N">None</option>
+                  <option value="E">Even</option>
+                  <option value="O">Odd</option>
+                </select>
+              </div>
+              <div className="communication-field">
+                <label>Stop Bits:</label>
+                <input
+                  type="number"
+                  value={stopbits}
+                  min={1}
+                  max={2}
+                  disabled={connected || loading}
+                  onChange={(e) => setStopbits(Number(e.target.value))}
+                />
+              </div>
+              <div className="communication-field">
+                <label>Byte Size:</label>
+                <input
+                  type="number"
+                  value={bytesize}
+                  min={5}
+                  max={8}
+                  disabled={connected || loading}
+                  onChange={(e) => setBytesize(Number(e.target.value))}
+                />
+              </div>
+            </div>
 
-      {errorMessage && <p className="status error">⚠️ {errorMessage}</p>}
-      {connected && (
-        <p className="status connected">✅ Connected to {selectedPort}</p>
-      )}
-      {!connected && !errorMessage && (
-        <p className="status disconnected">🔌 Not connected</p>
+            <div className="connection-button-container">
+              {!connected ? (
+                <button
+                  className="connection-button"
+                  onClick={handleConnect}
+                  disabled={!selectedPort || loading}
+                >
+                  {loading ? "Connecting..." : "Connect Device"}
+                </button>
+              ) : (
+                <button
+                  className="connection-button"
+                  onClick={handleDisconnect}
+                  disabled={loading || running}
+                >
+                  {loading ? "Disconnecting..." : "Disconnect Device"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
