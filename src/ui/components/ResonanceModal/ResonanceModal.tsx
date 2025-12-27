@@ -710,7 +710,9 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             Firmware (device internal sweep)
           </label>
 
-          <label className="resonance-radio-label" style={{ marginLeft: 12 }}>
+          <label
+            className="resonance-radio-label" /* style={{ marginLeft: 12 }} */
+          >
             <input
               type="radio"
               name="resonance-mode"
