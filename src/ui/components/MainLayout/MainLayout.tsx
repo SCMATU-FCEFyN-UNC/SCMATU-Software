@@ -26,13 +26,15 @@ export function MainLayout() {
 
       {/* Main content */}
       <main className="main-content">
-        <section className="control-section">
-          <ControlPanel />
-        </section>
+        <div className="main-content-container">
+          <section className="control-section">
+            <ControlPanel />
+          </section>
 
-        <section className="monitoring-section">
-          <MonitoringPanel />
-        </section>
+          <section className="monitoring-section">
+            <MonitoringPanel />
+          </section>
+        </div>
       </main>
 
       {/* Footer */}

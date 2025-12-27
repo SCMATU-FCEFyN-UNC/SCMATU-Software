@@ -167,114 +167,118 @@ const ControlPanel: React.FC = () => {
   }
 
   return (
-    <div className="panel">
-      <h2>Control Panel</h2>
+    <div className="control-panel">
+      <div className="control-header">
+        <h2>Control Panel</h2>
+      </div>
 
-      <div className="fieldGroup">
-        <label>Frequency (Hz)</label>
-        <input
-          type="number"
-          value={frequency}
-          disabled={isDisabled}
-          onChange={(e) => setFrequency(Number(e.target.value))}
-        />
-        <div className="buttons">
-          <button onClick={handleSetFrequency} disabled={isDisabled}>
+      <div className="control-fields">
+        <div className="control-fieldgroup">
+          <label>Frequency (Hz)</label>
+          <input
+            type="number"
+            value={frequency}
+            disabled={isDisabled}
+            onChange={(e) => setFrequency(Number(e.target.value))}
+          />
+          <div className="control-buttons">
+            <button onClick={handleSetFrequency} disabled={isDisabled}>
+              Set
+            </button>
+            <button onClick={handleGetFrequency} disabled={isDisabled}>
+              Get
+            </button>
+          </div>
+        </div>
+
+        <div className="control-fieldgroup">
+          <label>Power Level (%)</label>
+          <input
+            type="number"
+            value={power}
+            min={0}
+            max={100}
+            disabled={isDisabled}
+            onChange={(e) => setPower(Number(e.target.value))}
+          />
+          <button onClick={handleSetPower} disabled={isDisabled}>
             Set
           </button>
-          <button onClick={handleGetFrequency} disabled={isDisabled}>
-            Get
-          </button>
         </div>
-      </div>
 
-      <div className="fieldGroup">
-        <label>Power Level (%)</label>
-        <input
-          type="number"
-          value={power}
-          min={0}
-          max={100}
-          disabled={isDisabled}
-          onChange={(e) => setPower(Number(e.target.value))}
-        />
-        <button onClick={handleSetPower} disabled={isDisabled}>
-          Set
-        </button>
-      </div>
-
-      {/* Transducer enable/disable toggle */}
-      <div className="fieldGroup">
-        <label>Transducer</label>
-        <div
-          className="transducer-row"
-          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-        >
+        {/* Transducer enable/disable toggle */}
+        <div className="control-transducer-enabler">
+          <label>Transducer Status:</label>
           <span>{transducerEnabled ? "Enabled" : "Disabled"}</span>
           <button onClick={handleToggleTransducer} disabled={isDisabled}>
             {transducerEnabled ? "Disable" : "Enable"}
           </button>
         </div>
-      </div>
 
-      {/* On time (ms) */}
-      <div className="fieldGroup">
-        <label>On Time (ms)</label>
-        <input
-          type="number"
-          value={onTime}
-          min={0}
-          disabled={isDisabled}
-          onChange={(e) => setOnTime(Number(e.target.value))}
-        />
-        <button onClick={handleSetOnTime} disabled={isDisabled}>
-          Set
-        </button>
-      </div>
-
-      {/* Off time (ms) */}
-      <div className="fieldGroup">
-        <label>Off Time (ms)</label>
-        <input
-          type="number"
-          value={offTime}
-          min={0}
-          disabled={isDisabled}
-          onChange={(e) => setOffTime(Number(e.target.value))}
-        />
-        <button onClick={handleSetOffTime} disabled={isDisabled}>
-          Set
-        </button>
-      </div>
-
-      {/* Closed Loop Control (migrated from DeviceDataPanel) */}
-      <div className="fieldGroup">
-        <label>Closed Loop Control</label>
-        <div
-          className="closed-loop-row"
-          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-        >
-          <span>{closedLoopControlEnabled ? "Enabled" : "Disabled"}</span>
-          <button
-            onClick={handleToggleClosedLoopControl}
+        {/* On time (ms) */}
+        <div className="control-fieldgroup">
+          <label>On Time (ms)</label>
+          <input
+            type="number"
+            value={onTime}
+            min={0}
             disabled={isDisabled}
-            style={{ marginRight: "8px" }}
-          >
-            {closedLoopControlEnabled
-              ? "Disable Closed Loop"
-              : "Enable Closed Loop"}
-          </button>
-          <button
-            onClick={() => handleGetClosedLoopControlEnabled()}
-            disabled={isDisabled}
-          >
-            Update
+            onChange={(e) => setOnTime(Number(e.target.value))}
+          />
+          <button onClick={handleSetOnTime} disabled={isDisabled}>
+            Set
           </button>
         </div>
-      </div>
 
-      {!connected && <p className="warning">⚠️ Connect to a device first</p>}
-      {message && <p className="message">{message}</p>}
+        {/* Off time (ms) */}
+        <div className="control-fieldgroup">
+          <label>Off Time (ms)</label>
+          <input
+            type="number"
+            value={offTime}
+            min={0}
+            disabled={isDisabled}
+            onChange={(e) => setOffTime(Number(e.target.value))}
+          />
+          <button onClick={handleSetOffTime} disabled={isDisabled}>
+            Set
+          </button>
+        </div>
+
+        {/* Closed Loop Control (migrated from DeviceDataPanel) */}
+        <div className="control-closed-loop-status">
+          <label>Closed Loop Control</label>
+          <div className="control-closed-loop-fields">
+            <label>Status:</label>
+            <span>{closedLoopControlEnabled ? "Enabled" : "Disabled"}</span>
+            <button
+              onClick={handleToggleClosedLoopControl}
+              disabled={isDisabled}
+              style={{ marginRight: "8px" }}
+            >
+              {closedLoopControlEnabled
+                ? "Disable Closed Loop"
+                : "Enable Closed Loop"}
+            </button>
+            <button
+              onClick={() => handleGetClosedLoopControlEnabled()}
+              disabled={isDisabled}
+            >
+              Update
+            </button>
+          </div>
+        </div>
+        <div className="control-panel-warning">
+          {!connected && (
+            <p className="control-panel-warning">
+              ⚠️ Connect to a device first
+            </p>
+          )}
+        </div>
+        <div className="control-panel-message">
+          {message && <p className="control-panel-messagee">{message}</p>}
+        </div>
+      </div>
     </div>
   );
 };

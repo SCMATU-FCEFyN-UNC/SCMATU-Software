@@ -1,226 +1,573 @@
-.panel {
+@use '../../styles/mixins' as m;
+@use '../../styles/variables' as v;
+
+.monitoring-panel {
   border: 1px solid #ccc;
   border-radius: 10px;
   padding: 1rem;
   background: #f9f9f9;
-  margin-top: 1rem;
-  max-width: 500px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  margin: 0;
+}
 
+.monitoring-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
+  
   h2 {
-    margin-bottom: 1rem;
-    font-size: 1.4rem;
+    margin: 0;
+    padding: 0;
+    //font-size: 2rem;
+    font-weight: bold;
     color: #333;
   }
 }
 
-.monitoring-fieldGroup {
-  margin-bottom: 1rem;
+/* PHASE DIFFERENCE - Special layout for two inputs in same row */
+.phase-difference {
+  .phase-inputs-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    
+    @include m.desktop_size {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      column-gap: 1rem;
+      align-items: center;
+    }
+    
+    .input-with-unit {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      
+      input {
+        flex: 1;
+        min-width: 0; // Important for flex items to shrink properly
+        padding: 1rem 0;
+        border: 1px solid #ccc;
+        text-align: center;
+        background: #fff;
+        box-sizing: border-box;
+      }
+      
+      select {
+        width: 4rem;
+        min-width: 4rem;
+        padding: 1rem 0;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background: #fff;
+        text-align: center;
+        cursor: pointer;
+        box-sizing: border-box;
+        
+        &:disabled {
+          background: #f0f0f0;
+          cursor: not-allowed;
+        }
+      }
+    }
+    
+    .phase-relationship {
+      color: #555;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 0.5rem;
+      box-sizing: border-box;
+      
+      @include m.desktop_size {
+        text-align: left;
+        padding: 0;
+      }
+    }
+  }
+}
+
+/* MAIN MONITORING FIELDS - Grid layout */
+.monitoring-fields {
   display: flex;
   flex-direction: column;
+  gap: 1rem;
   align-items: center;
   justify-content: center;
-
-  label {
-    font-weight: bold;
-    margin-bottom: 0.3rem;
-  }
-
-  input {
-    padding: 0.4rem 0.8rem;
-    font-size: 1rem;
-    border: 1px solid #bbb;
-    border-radius: 5px;
-    margin-bottom: 0.5rem;
-    background: #e9ecef;
-    color: #007bff;
-    font-weight: 500;
-    //width: 100%;
-    //max-width: 90%;
-  }
-
-  small {
-    color: #555;
-    font-size: 0.85rem;
-    margin-bottom: 0.3rem;
-  }
-
-  .input-row {
-    width: 100%;
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  
+  @include m.desktop_size {
     display: grid;
     grid-template-columns: 1fr 1fr;
     column-gap: 1rem;
-
-    .input-with-unit {
-      width: 100%;
-      
-      input {
-        width: 80%;
-      }
-      select {
-        width: 20%;
-      }
-    }
-
   }
+  
+  @include m.desktopXL_size {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    column-gap: 1rem;
+  }
+}
 
-  button {
+.monitoring-fieldgroup {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  
+  label {
+    //font-weight: bold;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    box-sizing: border-box;
+  }
+  
+  input {
     width: 100%;
     max-width: 100%;
-    padding: 0.4rem 0.8rem;
-    font-size: 1rem;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    background: #007bff;
-    color: white;
-    transition: background 0.2s ease-in-out;
-
-    &:hover:not(:disabled) {
-      background: #0056b3;
+    padding: 1rem 0;
+    border: 1px solid #ccc;
+    text-align: center;
+    background: #fff;
+    box-sizing: border-box;
+  }
+  
+  .input-with-unit {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    
+    input {
+      flex: 1;
+      min-width: 0; // Important for flex items to shrink properly
+      padding: 1rem 0;
+      border: 1px solid #ccc;
+      text-align: center;
+      background: #fff;
+      box-sizing: border-box;
     }
-
-    &:disabled {
-      background: #aaa;
-      cursor: not-allowed;
+    
+    select {
+      width: 4rem;
+      min-width: 4rem;
+      padding: 1rem 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background: #fff;
+      text-align: center;
+      cursor: pointer;
+      box-sizing: border-box;
+      
+      &:disabled {
+        background: #f0f0f0;
+        cursor: not-allowed;
+      }
     }
+  }
+  
+  // Override global button width for monitoring panel
+   button {
+    &:not(:disabled):hover {
+      transform: scale(1.02);
+    }
+  } 
+  
+  small {
+    color: #555;
+    font-size: 0.85rem;
+    text-align: center;
+    box-sizing: border-box;
   }
 }
 
-.buttons {
-  display: flex;
-  justify-content: center;
-  margin-top: 1rem;
-
-  button {
-    padding: 0.6rem 1.2rem;
-    font-size: 1rem;
+/* RESONANCE SECTION - Collapsible */
+.resonance-section {
+  margin-top: 2rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  background: #fff;
+  
+  .resonance-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    
+    label {
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+      text-align: center;
+    }
+    
+    small {
+      font-size: 0.95rem;
+      color: #666;
+      text-align: center;
+    }
+  }
+  
+  .frequency-grid {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
     border-radius: 6px;
+    box-sizing: border-box;
+    overflow: hidden;
+    position: relative;
+    padding-bottom: 3rem; // Extra space for the arrow
+  }
+  
+  .frequency-toggle {
+    position: absolute;
+    bottom: 0.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+    
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+    
+    .arrow {
+      margin-left: 0;
+      border: solid #333;
+      border-width: 0 2px 2px 0;
+      display: inline-block;
+      padding: 5px;
+      cursor: pointer;
+      transform: rotate(45deg);
+    }
+    
+    .arrow.down {
+      transform: rotate(45deg);
+    }
+    
+    .arrow.up {
+      transform: rotate(-135deg);
+    }
+  }
+  
+  .frequency-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 8px;
+    padding: 1.2rem;
+    gap: 1rem;
+    
+    // SMALL & MEDIUM SCREENS: frequency on top, phase+current on bottom (2 rows)
+    // This applies until desktop_size breakpoint
+    
+    @include m.desktop_size {
+      // LARGE SCREENS: horizontal layout (single row with 4 columns)
+      display: grid;
+      grid-template-columns: 140px 1fr 1fr 1fr;
+      gap: 1.2rem;
+      background: transparent;
+      border-radius: 0;
+      padding: 1rem;
+      border-bottom: 1px solid #f0f0f0;
+      
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+    
+    @include m.desktopXL_size {
+      // EXTRA LARGE SCREENS
+      grid-template-columns: 160px 1fr 1fr 1fr;
+      gap: 1.5rem;
+      padding: 1.2rem;
+    }
+    
+    .frequency-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #eee;
+      width: 100%;
+      
+      @include m.desktop_size {
+        justify-content: flex-start;
+        padding-bottom: 0;
+        border-bottom: none;
+        width: auto;
+      }
+      
+      label {
+        font-weight: bold;
+        color: #333;
+        margin: 0;
+        text-align: center;
+        font-size: 1.1rem;
+        
+        @include m.desktop_size {
+          text-align: left;
+          font-size: 1.1rem;
+        }
+        
+        @include m.desktopXL_size {
+          font-size: 1.2rem;
+        }
+      }
+    }
+    
+    // Frequency cell styling for all sizes
+    .frequency-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      width: 100%;
+      
+      label {
+        font-size: 0.9rem;
+        color: #666;
+        margin-bottom: 0.5rem;
+        text-align: center;
+        font-weight: 600;
+        width: 100%;
+        
+        @include m.desktop_size {
+          font-size: 0.9rem;
+          font-weight: normal;
+        }
+        
+        @include m.desktopXL_size {
+          font-size: 1rem;
+          margin-bottom: 0.6rem;
+        }
+      }
+      
+      input {
+        width: 100%;
+        max-width: 100%;
+        padding: 0.9rem 0.5rem;
+        font-size: 1rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: #fff;
+        color: #333;
+        text-align: center;
+        box-sizing: border-box;
+        
+        @include m.desktop_size {
+          font-size: 1rem;
+          padding: 0.8rem;
+        }
+        
+        @include m.desktopXL_size {
+          font-size: 1.1rem;
+          padding: 1rem 0.5rem;
+        }
+      }
+    }
+    
+    // Frequency-specific styling (top row on mobile)
+    .frequency-cell:first-of-type {
+      // Mobile: frequency gets special styling
+      min-height: 65px;
+      padding: 0.9rem;
+      background: #f9f9f9;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      
+      label {
+        color: #007bff;
+      }
+      
+      input {
+        font-size: 1.1rem;
+        font-weight: bold;
+      }
+      
+      @include m.desktop_size {
+        // Desktop: remove mobile-specific styling
+        min-height: 70px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        
+        label {
+          color: #666;
+        }
+        
+        input {
+          font-size: 1rem;
+          font-weight: normal;
+          background: #fff;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+        }
+      }
+      
+      @include m.desktopXL_size {
+        min-height: 80px;
+      }
+    }
+    
+    // Phase-current container for mobile/medium screens
+    .phase-current-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      width: 100%;
+      
+      .frequency-cell {
+        min-height: 65px;
+        padding: 0.9rem;
+        background: #f9f9f9;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        
+        input {
+          background: #fff;
+        }
+        
+        @include m.desktop_size {
+          // Desktop: remove container and show as regular cells
+          display: none;
+        }
+      }
+      
+      @include m.desktop_size {
+        display: none;
+      }
+    }
+    
+    // Individual phase and current cells for desktop
+    .phase-cell,
+    .current-cell {
+      display: none;
+      
+      @include m.desktop_size {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 70px;
+        
+        @include m.desktopXL_size {
+          min-height: 80px;
+        }
+      }
+    }
+  }
+  
+  button {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    min-width: 200px;
+    
+    @include m.desktopXL_size {
+      padding: 1.2rem 2.5rem;
+      font-size: 1.2rem;
+    }
+    
+    &:not(:disabled):hover {
+      transform: scale(1.02);
+    }
   }
 }
 
+/* ACTION BUTTONS */
+.monitoring-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  
+  @include m.desktop_size {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1rem;
+  }
+  
+  // Override global button width for action buttons
+  button {
+    &:not(:disabled):hover {
+      transform: scale(1.02);
+    }
+  } 
+}
+
+/* MESSAGES */
 .warning {
   text-align: center;
   color: #cc8800;
-  font-weight: 500;
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: #fff8e1;
+  border: 1px solid #ffd54f;
+  border-radius: 5px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .message {
   margin-top: 1rem;
+  padding: 0.5rem 1rem;
   font-size: 0.95rem;
   color: #333;
   text-align: center;
-}
-
-.input-with-unit {
-  display: flex;
-  gap: 8px;
+  background: #e8f5e8;
+  border: 1px solid #4caf50;
+  border-radius: 5px;
   width: 100%;
-  
-  input {
-    flex: 1;
-    width: 90%;
-    max-height: 2rem;
-  }
-  
-  select {
-    width: 10%;
-    height: auto;
-    max-height: 2rem;
-    font-size: 1rem;
-    border: 1px solid #bbb;
-    border-radius: 0.25rem;
-    text-align: center;
-  }
-}
-
-.no-unit-input {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  
-  input {
-    flex: 1;
-    width: 100%;
-    max-height: 2rem;
-  }
-}
-
-.three-input-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  column-gap: 1rem;
-  align-items: center;
-  justify-content: center;
-  .no-unit-input
-  {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    input
-    {
-      max-width: 5rem;
-    }
-  }
-  
-  .input-with-unit
-  {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    input
-    {
-      max-width: 5rem;
-    }
-  }
-  
-}
-
-.frequency-grid {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.frequency-row {
-  display: grid;
-  grid-template-columns: 120px 1fr 1fr 1fr;
-  column-gap: 0.8rem;
-  align-items: flex-end;
-  width: 100%;
-
-  .frequency-label {
-    grid-column: 1;
-  }
-
-  .frequency-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 60px;
-
-    label {
-      font-size: 0.8rem;
-      color: #666;
-      margin-bottom: 0.3rem;
-      text-align: center;
-      font-weight: normal;
-    }
-
-    input {
-      width: 100%;
-      padding: 0.4rem 0.6rem;
-      font-size: 0.9rem;
-      border: 1px solid #bbb;
-      border-radius: 5px;
-      background: #e9ecef;
-      color: #007bff;
-      font-weight: 500;
-      text-align: center;
-    }
-  }
+  max-width: 100%;
+  box-sizing: border-box;
 }

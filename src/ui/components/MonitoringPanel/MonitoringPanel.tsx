@@ -218,10 +218,19 @@ const MonitoringPanel: React.FC = () => {
   const { running } = useResonanceStatus();
   const isDisabled = !connected || loading || running;
 
+  const [isResonanceCollapsed, setIsResonanceCollapsed] = useState(true);
+
+  // Update the renderFrequencyRow function to accept an optional isCollapsed parameter
   const renderFrequencyRow = (
     label: string,
-    metrics: FrequencyMetrics | null
+    metrics: FrequencyMetrics | null,
+    isCollapsed: boolean = false
   ) => {
+    // If collapsed and this is not "Best Overall", don't render
+    if (isCollapsed && label !== "Best Overall") {
+      return null;
+    }
+
     if (!metrics) {
       return (
         <div className="frequency-row" key={label}>
@@ -232,11 +241,23 @@ const MonitoringPanel: React.FC = () => {
             <label>Frequency (Hz)</label>
             <input type="text" value="-" readOnly />
           </div>
-          <div className="frequency-cell">
+          {/* Mobile/Medium: phase and current in same row */}
+          <div className="phase-current-container">
+            <div className="frequency-cell">
+              <label>Phase</label>
+              <input type="text" value="-" readOnly />
+            </div>
+            <div className="frequency-cell">
+              <label>Current</label>
+              <input type="text" value="-" readOnly />
+            </div>
+          </div>
+          {/* Desktop: individual cells */}
+          <div className="frequency-cell phase-cell">
             <label>Phase</label>
             <input type="text" value="-" readOnly />
           </div>
-          <div className="frequency-cell">
+          <div className="frequency-cell current-cell">
             <label>Current</label>
             <input type="text" value="-" readOnly />
           </div>
@@ -257,11 +278,23 @@ const MonitoringPanel: React.FC = () => {
             readOnly
           />
         </div>
-        <div className="frequency-cell">
+        {/* Mobile/Medium: phase and current in same row */}
+        <div className="phase-current-container">
+          <div className="frequency-cell">
+            <label>Phase</label>
+            <input type="text" value={metrics.phase.toString()} readOnly />
+          </div>
+          <div className="frequency-cell">
+            <label>Current</label>
+            <input type="text" value={metrics.current.toString()} readOnly />
+          </div>
+        </div>
+        {/* Desktop: individual cells */}
+        <div className="frequency-cell phase-cell">
           <label>Phase</label>
           <input type="text" value={metrics.phase.toString()} readOnly />
         </div>
-        <div className="frequency-cell">
+        <div className="frequency-cell current-cell">
           <label>Current</label>
           <input type="text" value={metrics.current.toString()} readOnly />
         </div>
@@ -270,178 +303,201 @@ const MonitoringPanel: React.FC = () => {
   };
 
   return (
-    <div className="panel">
-      <h2>Monitoring Panel</h2>
+    <div className="monitoring-panel">
+      <div className="monitoring-header">
+        <h2>Monitoring Panel</h2>
+      </div>
 
-      {/* PHASE */}
-      <div className="monitoring-fieldGroup">
+      {/* PHASE DIFFERENCE - Special row that stays together */}
+      <div className="monitoring-fieldgroup phase-difference">
         <label>Phase Difference</label>
-        <div className="input-row">
-          <div>
-            <div className="input-with-unit" style={{ flex: 1 }}>
-              <input
-                type="text"
-                value={formatPhaseTime(data.phase, selectedUnits.phase)}
-                readOnly
-              />
-              <select
-                value={selectedUnits.phase}
-                onChange={(e) => handleUnitChange("phase", e.target.value)}
-                disabled={isDisabled}
-              >
-                {unitConversions.phase.map((unit) => (
-                  <option key={unit.label} value={unit.label}>
-                    {unit.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="phase-inputs-container">
+          <div className="input-with-unit">
+            <input
+              type="text"
+              value={formatPhaseTime(data.phase, selectedUnits.phase)}
+              readOnly
+            />
+            <select
+              value={selectedUnits.phase}
+              onChange={(e) => handleUnitChange("phase", e.target.value)}
+              disabled={isDisabled}
+            >
+              {unitConversions.phase.map((unit) => (
+                <option key={unit.label} value={unit.label}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
           </div>
-          <div>
-            <div className="input-with-unit">
-              <input
-                type="text"
-                value={formatPhaseAngle(data.phase)}
-                readOnly
-              />
-              <select
-                value={phaseAngleUnit}
-                onChange={(e) =>
-                  handleAngleUnitChange(e.target.value as "deg" | "rad")
-                }
-                disabled={isDisabled}
-              >
-                <option value="deg">°</option>
-                <option value="rad">rad</option>
-              </select>
-            </div>
-          </div>
-        </div>
 
-        {data.phase && (
-          <small className="phase-relationship">
-            {getPhaseRelationship(data.phase)}
-          </small>
-        )}
+          <div className="input-with-unit">
+            <input type="text" value={formatPhaseAngle(data.phase)} readOnly />
+            <select
+              value={phaseAngleUnit}
+              onChange={(e) =>
+                handleAngleUnitChange(e.target.value as "deg" | "rad")
+              }
+              disabled={isDisabled}
+            >
+              <option value="deg">°</option>
+              <option value="rad">rad</option>
+            </select>
+          </div>
+
+          {data.phase && (
+            <small className="phase-relationship">
+              {getPhaseRelationship(data.phase)}
+            </small>
+          )}
+        </div>
         <button onClick={() => fetchMetric("phase")} disabled={isDisabled}>
           Refresh
         </button>
       </div>
 
-      {/* VOLTAGE */}
-      <div className="monitoring-fieldGroup">
-        <label>Voltage (V)</label>
-        <div className="no-unit-input">
+      {/* MONITORING FIELDS - Grid layout */}
+      <div className="monitoring-fields">
+        {/* VOLTAGE */}
+        <div className="monitoring-fieldgroup">
+          <label>Voltage (V)</label>
           <input
             type="text"
             value={data.voltage !== null ? data.voltage.toFixed(3) : ""}
             readOnly
           />
+          <button onClick={() => fetchMetric("voltage")} disabled={isDisabled}>
+            Refresh
+          </button>
         </div>
-        <button onClick={() => fetchMetric("voltage")} disabled={isDisabled}>
-          Refresh
-        </button>
+
+        {/* CURRENT */}
+        <div className="monitoring-fieldgroup">
+          <label>Current</label>
+          <div className="input-with-unit">
+            <input
+              type="text"
+              value={formatValue(data.current, "current")}
+              readOnly
+            />
+            <select
+              value={selectedUnits.current}
+              onChange={(e) => handleUnitChange("current", e.target.value)}
+              disabled={isDisabled}
+            >
+              {unitConversions.current.map((unit) => (
+                <option key={unit.label} value={unit.label}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button onClick={() => fetchMetric("current")} disabled={isDisabled}>
+            Refresh
+          </button>
+        </div>
+
+        {/* POWER */}
+        <div className="monitoring-fieldgroup">
+          <label>Power</label>
+          <div className="input-with-unit">
+            <input
+              type="text"
+              value={formatValue(data.power, "power")}
+              readOnly
+            />
+            <select
+              value={selectedUnits.power}
+              onChange={(e) => handleUnitChange("power", e.target.value)}
+              disabled={isDisabled}
+            >
+              {unitConversions.power.map((unit) => (
+                <option key={unit.label} value={unit.label}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button onClick={() => fetchMetric("power")} disabled={isDisabled}>
+            Refresh
+          </button>
+        </div>
+
+        {/* PERIOD */}
+        <div className="monitoring-fieldgroup">
+          <label>Signal Period</label>
+          <div className="input-with-unit">
+            <input
+              type="text"
+              value={formatValue(data.period, "period")}
+              readOnly
+            />
+            <select
+              value={selectedUnits.period}
+              onChange={(e) => handleUnitChange("period", e.target.value)}
+              disabled={isDisabled}
+            >
+              {unitConversions.period.map((unit) => (
+                <option key={unit.label} value={unit.label}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button onClick={() => fetchMetric("period")} disabled={isDisabled}>
+            Refresh
+          </button>
+        </div>
       </div>
 
-      {/* CURRENT */}
-      <div className="monitoring-fieldGroup">
-        <label>Current</label>
-        <div className="input-with-unit">
-          <input
-            type="text"
-            value={formatValue(data.current, "current")}
-            readOnly
-          />
-          <select
-            value={selectedUnits.current}
-            onChange={(e) => handleUnitChange("current", e.target.value)}
-            disabled={isDisabled}
-          >
-            {unitConversions.current.map((unit) => (
-              <option key={unit.label} value={unit.label}>
-                {unit.label}
-              </option>
-            ))}
-          </select>
+      {/* RESONANCE FREQUENCY - Collapsible */}
+      <div className="monitoring-fieldgroup resonance-section">
+        <div className="resonance-header">
+          <label>Resonance Frequency</label>
+          {data.resonance && (
+            <small>Status: {data.resonance.status_text}</small>
+          )}
         </div>
-        <button onClick={() => fetchMetric("current")} disabled={isDisabled}>
-          Refresh
-        </button>
-      </div>
 
-      {/* POWER */}
-      <div className="monitoring-fieldGroup">
-        <label>Power</label>
-        <div className="input-with-unit">
-          <input
-            type="text"
-            value={formatValue(data.power, "power")}
-            readOnly
-          />
-          <select
-            value={selectedUnits.power}
-            onChange={(e) => handleUnitChange("power", e.target.value)}
-            disabled={isDisabled}
-          >
-            {unitConversions.power.map((unit) => (
-              <option key={unit.label} value={unit.label}>
-                {unit.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button onClick={() => fetchMetric("power")} disabled={isDisabled}>
-          Refresh
-        </button>
-      </div>
-
-      {/* PERIOD */}
-      <div className="monitoring-fieldGroup">
-        <label>Signal Period</label>
-        <div className="input-with-unit">
-          <input
-            type="text"
-            value={formatValue(data.period, "period")}
-            readOnly
-          />
-          <select
-            value={selectedUnits.period}
-            onChange={(e) => handleUnitChange("period", e.target.value)}
-            disabled={isDisabled}
-          >
-            {unitConversions.period.map((unit) => (
-              <option key={unit.label} value={unit.label}>
-                {unit.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button onClick={() => fetchMetric("period")} disabled={isDisabled}>
-          Refresh
-        </button>
-      </div>
-
-      {/* RESONANCE - THREE FREQUENCIES - ALWAYS SHOW GRID */}
-      <div className="monitoring-fieldGroup">
-        <label>Resonance Frequency</label>
-        {data.resonance && <small>Status: {data.resonance.status_text}</small>}
         <div className="frequency-grid">
+          {/* Always show Best Overall */}
           {renderFrequencyRow(
             "Best Overall",
             data.resonance?.best_overall ?? null
           )}
-          {renderFrequencyRow("Best Phase", data.resonance?.best_phase ?? null)}
-          {renderFrequencyRow(
-            "Best Current",
-            data.resonance?.best_current ?? null
+
+          {/* Conditionally show Best Phase and Best Current */}
+          {!isResonanceCollapsed && (
+            <>
+              {renderFrequencyRow(
+                "Best Phase",
+                data.resonance?.best_phase ?? null
+              )}
+              {renderFrequencyRow(
+                "Best Current",
+                data.resonance?.best_current ?? null
+              )}
+            </>
           )}
+
+          {/* Arrow at bottom of frequency grid */}
+          <div
+            className="frequency-toggle"
+            onClick={() => setIsResonanceCollapsed(!isResonanceCollapsed)}
+          >
+            <span
+              className={`arrow ${isResonanceCollapsed ? "down" : "up"}`}
+            ></span>
+          </div>
         </div>
+
         <button onClick={() => fetchMetric("resonance")} disabled={isDisabled}>
           Refresh
         </button>
       </div>
 
-      <div className="buttons">
+      {/* ACTION BUTTONS */}
+      <div className="monitoring-actions">
         <button onClick={fetchAllMetrics} disabled={isDisabled}>
           🔄 Refresh All
         </button>
@@ -453,9 +509,11 @@ const MonitoringPanel: React.FC = () => {
         </button>
       </div>
 
+      {/* MESSAGES */}
       {!connected && <p className="warning">⚠️ Connect to a device first</p>}
       {message && <p className="message">{message}</p>}
 
+      {/* MODAL */}
       {showResonanceModal && (
         <ResonanceModal onClose={() => setShowResonanceModal(false)} />
       )}
