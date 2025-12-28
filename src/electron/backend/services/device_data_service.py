@@ -109,7 +109,7 @@ class DeviceDataService:
         """
         if password is None:
             raise ValueError("Password required")
-        manager.write("holding", 20, 22, int(password))
+        manager.write("holding", 20, 24, int(password))
         return {"success": True, "password_written": True}
 
     @staticmethod
@@ -124,7 +124,7 @@ class DeviceDataService:
         except ValueError:
             raise ValueError("Serial number must be numeric")
         
-        manager.write("holding", 20, 21, serial_int)
+        manager.write("holding", 20, 23, serial_int)
         
         return {"success": True, "serial_number": serial_int}
 
@@ -133,7 +133,7 @@ class DeviceDataService:
         """
         Get the status of the last serial number write attempt from holding register 23.
         """
-        status = manager.read("holding", 20, 23)
+        status = manager.read("holding", 20, 25)
         if status is None:
             raise ValueError("Failed to read serial number write status")
         return int(status)
