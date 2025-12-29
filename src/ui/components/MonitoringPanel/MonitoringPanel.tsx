@@ -12,8 +12,9 @@ interface PhaseData {
 
 interface FrequencyMetrics {
   frequency: number;
-  phase: number;
-  current: number;
+  phase_ns: number | null; // New: phase in nanoseconds
+  phase_deg: number | null; // New: phase in degrees
+  current: number | null; // This is now in Amps, not ADC
 }
 
 interface ResonanceData {
@@ -220,7 +221,6 @@ const MonitoringPanel: React.FC = () => {
 
   const [isResonanceCollapsed, setIsResonanceCollapsed] = useState(true);
 
-  // Update the renderFrequencyRow function to accept an optional isCollapsed parameter
   const renderFrequencyRow = (
     label: string,
     metrics: FrequencyMetrics | null,
@@ -281,22 +281,52 @@ const MonitoringPanel: React.FC = () => {
         {/* Mobile/Medium: phase and current in same row */}
         <div className="phase-current-container">
           <div className="frequency-cell">
-            <label>Phase</label>
-            <input type="text" value={metrics.phase.toString()} readOnly />
+            <label>Phase (deg)</label>
+            <input
+              type="text"
+              value={
+                metrics.phase_deg !== null
+                  ? metrics.phase_deg.toFixed(2) + "°"
+                  : "-"
+              }
+              readOnly
+            />
           </div>
           <div className="frequency-cell">
             <label>Current</label>
-            <input type="text" value={metrics.current.toString()} readOnly />
+            <input
+              type="text"
+              value={
+                metrics.current !== null
+                  ? metrics.current.toFixed(4) + " A"
+                  : "-"
+              }
+              readOnly
+            />
           </div>
         </div>
         {/* Desktop: individual cells */}
         <div className="frequency-cell phase-cell">
-          <label>Phase</label>
-          <input type="text" value={metrics.phase.toString()} readOnly />
+          <label>Phase (deg)</label>
+          <input
+            type="text"
+            value={
+              metrics.phase_deg !== null
+                ? metrics.phase_deg.toFixed(2) + "°"
+                : "-"
+            }
+            readOnly
+          />
         </div>
         <div className="frequency-cell current-cell">
           <label>Current</label>
-          <input type="text" value={metrics.current.toString()} readOnly />
+          <input
+            type="text"
+            value={
+              metrics.current !== null ? metrics.current.toFixed(4) + " A" : "-"
+            }
+            readOnly
+          />
         </div>
       </div>
     );

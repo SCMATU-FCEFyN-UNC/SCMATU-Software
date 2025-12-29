@@ -191,49 +191,101 @@ def get_resonance_frequency(slave: int = 20):
 
     # Only read frequency data if measurement succeeded
     if status == 1:
-        # Best Overall Frequency
+        # Helper function to convert signed phase from register
+        def decode_signed_phase(phase_raw):
+            if phase_raw is None:
+                return None
+            if phase_raw >= 32768:
+                phase_raw -= 65536
+            return float(phase_raw)
+        
+        # Helper function to convert phase in nanoseconds to degrees
+        def ns_to_deg(phase_ns, frequency_hz):
+            if phase_ns is None or frequency_hz is None or frequency_hz <= 0:
+                return None
+            period_ns = 1e9 / frequency_hz
+            phase_deg = (phase_ns / period_ns) * 360.0
+            return phase_deg
+        
+        # Helper function to convert ADC current to Amps
+        def adc_to_current(adc_value):
+            if adc_value is None:
+                return None
+            
+            # Read calibration values
+            c_gain_raw = manager.read("holding", slave, 14)
+            r_shunt_raw = manager.read("holding", slave, 15)
+            
+            if c_gain_raw is None or r_shunt_raw is None:
+                return None
+            
+            c_gain = c_gain_raw / 1000.0
+            r_shunt = r_shunt_raw / 100.0
+            
+            if c_gain == 0 or r_shunt == 0:
+                return None
+            
+            amplified_vr = (adc_value / 4095.0) * VREF
+            vr_voltage = amplified_vr / c_gain
+            current_a = vr_voltage / r_shunt
+            
+            return current_a
+
+        # Read and process Best Overall Frequency
         best_overall_hi = manager.read("input", slave, 10)
         best_overall_lo = manager.read("input", slave, 11)
-        best_overall_phase = manager.read("input", slave, 12)
-        best_overall_current = manager.read("input", slave, 13)
+        best_overall_phase_raw = manager.read("input", slave, 12)
+        best_overall_current_raw = manager.read("input", slave, 13)
 
-        if any(val is None for val in [best_overall_hi, best_overall_lo, best_overall_phase, best_overall_current]):
-            raise ValueError("Failed to read best overall frequency registers")
+        if not any(val is None for val in [best_overall_hi, best_overall_lo, best_overall_phase_raw, best_overall_current_raw]):
+            overall_freq = (best_overall_hi << 16) | best_overall_lo
+            phase_ns = decode_signed_phase(best_overall_phase_raw)
+            phase_deg = ns_to_deg(phase_ns, overall_freq)
+            current_a = adc_to_current(best_overall_current_raw)
+            
+            result["best_overall"] = {
+                "frequency": overall_freq,
+                "phase_ns": phase_ns,
+                "phase_deg": phase_deg,
+                "current": current_a,
+            }
 
-        result["best_overall"] = {
-            "frequency": (best_overall_hi << 16) | best_overall_lo,
-            "phase": best_overall_phase,
-            "current": best_overall_current,
-        }
-
-        # Best Phase Frequency
+        # Read and process Best Phase Frequency
         best_phase_hi = manager.read("input", slave, 14)
         best_phase_lo = manager.read("input", slave, 15)
-        best_phase_phase = manager.read("input", slave, 16)
-        best_phase_current = manager.read("input", slave, 17)
+        best_phase_phase_raw = manager.read("input", slave, 16)
+        best_phase_current_raw = manager.read("input", slave, 17)
 
-        if any(val is None for val in [best_phase_hi, best_phase_lo, best_phase_phase, best_phase_current]):
-            raise ValueError("Failed to read best phase frequency registers")
+        if not any(val is None for val in [best_phase_hi, best_phase_lo, best_phase_phase_raw, best_phase_current_raw]):
+            phase_freq = (best_phase_hi << 16) | best_phase_lo
+            phase_ns = decode_signed_phase(best_phase_phase_raw)
+            phase_deg = ns_to_deg(phase_ns, phase_freq)
+            current_a = adc_to_current(best_phase_current_raw)
+            
+            result["best_phase"] = {
+                "frequency": phase_freq,
+                "phase_ns": phase_ns,
+                "phase_deg": phase_deg,
+                "current": current_a,
+            }
 
-        result["best_phase"] = {
-            "frequency": (best_phase_hi << 16) | best_phase_lo,
-            "phase": best_phase_phase,
-            "current": best_phase_current,
-        }
-
-        # Best Current Frequency
+        # Read and process Best Current Frequency
         best_current_hi = manager.read("input", slave, 18)
         best_current_lo = manager.read("input", slave, 19)
-        best_current_phase = manager.read("input", slave, 20)
-        best_current_current = manager.read("input", slave, 21)
+        best_current_phase_raw = manager.read("input", slave, 20)
+        best_current_current_raw = manager.read("input", slave, 21)
 
-        if any(val is None for val in [best_current_hi, best_current_lo, best_current_phase, best_current_current]):
-            raise ValueError("Failed to read best current frequency registers")
-
-        result["best_current"] = {
-            "frequency": (best_current_hi << 16) | best_current_lo,
-            "phase": best_current_phase,
-            "current": best_current_current,
-        }
+        if not any(val is None for val in [best_current_hi, best_current_lo, best_current_phase_raw, best_current_current_raw]):
+            current_freq = (best_current_hi << 16) | best_current_lo
+            phase_ns = decode_signed_phase(best_current_phase_raw)
+            phase_deg = ns_to_deg(phase_ns, current_freq)
+            current_a = adc_to_current(best_current_current_raw)
+            
+            result["best_current"] = {
+                "frequency": current_freq,
+                "phase_ns": phase_ns,
+                "phase_deg": phase_deg,
+                "current": current_a,
+            }
 
     return result

@@ -437,12 +437,134 @@ def get_resonance_status(slave: int = 20):
             "best_phase": _sweep_state["best_phase"],
             "best_current": _sweep_state["best_current"],
             "error": _sweep_state["error"],
-            "plot_filepath": _sweep_state.get("plot_filepath"),  # Include plot filepath if available
+            "plot_filepath": _sweep_state.get("plot_filepath"),
             "plot_open": _sweep_state.get("plot_open", False),
         }
 
+    # For firmware mode, read and process the resonance data
     status = manager.read("input", slave, 9)
-    return {"success": True, "status_code": status}
+    
+    status_texts = {
+        0: "not obtained",
+        1: "obtained successfully",
+        2: "failed to obtain",
+        3: "measurement in progress",
+    }
+    status_text = status_texts.get(status, f"unknown ({status})")
+    
+    result = {
+        "success": True,
+        "status_code": status,
+        "status_text": status_text,
+        "best_overall": None,
+        "best_phase": None,
+        "best_current": None,
+    }
+    
+    # Only process data if measurement succeeded
+    if status == 1:
+        # Reuse the same helper functions from monitoring_service.py
+        # You might want to move these to a shared utilities file
+        VREF = 4.485
+        
+        def decode_signed_phase(phase_raw):
+            if phase_raw is None:
+                return None
+            if phase_raw >= 32768:
+                phase_raw -= 65536
+            return float(phase_raw)
+        
+        def ns_to_deg(phase_ns, frequency_hz):
+            if phase_ns is None or frequency_hz is None or frequency_hz <= 0:
+                return None
+            period_ns = 1e9 / frequency_hz
+            phase_deg = (phase_ns / period_ns) * 360.0
+            return phase_deg
+        
+        def adc_to_current(adc_value, slave_id=slave):
+            if adc_value is None:
+                return None
+            
+            # Read calibration values
+            c_gain_raw = manager.read("holding", slave_id, 14)
+            r_shunt_raw = manager.read("holding", slave_id, 15)
+            
+            if c_gain_raw is None or r_shunt_raw is None:
+                return None
+            
+            c_gain = c_gain_raw / 1000.0
+            r_shunt = r_shunt_raw / 100.0
+            
+            if c_gain == 0 or r_shunt == 0:
+                return None
+            
+            amplified_vr = (adc_value / 4095.0) * VREF
+            vr_voltage = amplified_vr / c_gain
+            current_a = vr_voltage / r_shunt
+            
+            return current_a
+
+        # Read and process Best Overall Frequency
+        overall_hi = manager.read("input", slave, 10)
+        overall_lo = manager.read("input", slave, 11)
+        overall_phase_raw = manager.read("input", slave, 12)
+        overall_current_raw = manager.read("input", slave, 13)
+
+        if not any(val is None for val in [overall_hi, overall_lo, overall_phase_raw, overall_current_raw]):
+            overall_freq = (overall_hi << 16) | overall_lo
+            phase_ns = decode_signed_phase(overall_phase_raw)
+            phase_deg = ns_to_deg(phase_ns, overall_freq)
+            current_a = adc_to_current(overall_current_raw)
+            
+            result["best_overall"] = {
+                "frequency": overall_freq,
+                "phase_ns": phase_ns,
+                "phase_deg": phase_deg,
+                "current": current_a,
+                "current_a": current_a,  # For compatibility
+            }
+
+        # Read and process Best Phase Frequency
+        phase_hi = manager.read("input", slave, 14)
+        phase_lo = manager.read("input", slave, 15)
+        phase_phase_raw = manager.read("input", slave, 16)
+        phase_current_raw = manager.read("input", slave, 17)
+
+        if not any(val is None for val in [phase_hi, phase_lo, phase_phase_raw, phase_current_raw]):
+            phase_freq = (phase_hi << 16) | phase_lo
+            phase_ns = decode_signed_phase(phase_phase_raw)
+            phase_deg = ns_to_deg(phase_ns, phase_freq)
+            current_a = adc_to_current(phase_current_raw)
+            
+            result["best_phase"] = {
+                "frequency": phase_freq,
+                "phase_ns": phase_ns,
+                "phase_deg": phase_deg,
+                "current": current_a,
+                "current_a": current_a,  # For compatibility
+            }
+
+        # Read and process Best Current Frequency
+        current_hi = manager.read("input", slave, 18)
+        current_lo = manager.read("input", slave, 19)
+        current_phase_raw = manager.read("input", slave, 20)
+        current_current_raw = manager.read("input", slave, 21)
+
+        if not any(val is None for val in [current_hi, current_lo, current_phase_raw, current_current_raw]):
+            current_freq = (current_hi << 16) | current_lo
+            phase_ns = decode_signed_phase(current_phase_raw)
+            phase_deg = ns_to_deg(phase_ns, current_freq)
+            current_a = adc_to_current(current_current_raw)
+            
+            result["best_current"] = {
+                "frequency": current_freq,
+                "phase_ns": phase_ns,
+                "phase_deg": phase_deg,
+                "current": current_a,
+                "current_a": current_a,  # For compatibility
+            }
+    
+    return result
 
 
 def _update_firmware_with_external_result(best_overall_freq: int, slave: int = 20):
