@@ -133,12 +133,11 @@ def get_current(slave: int = 20) -> float:
 def get_power(slave: int = 20) -> float:
     """Calculate power (VA) from latest voltage and current."""
     global _last_voltage, _last_current
-
-    if _last_voltage is None:
-        _last_voltage = get_voltage(slave)
-    if _last_current is None:
-        _last_current = get_current(slave)
-
+    
+    # Always fetch fresh voltage and current when power is requested
+    _last_voltage = get_voltage(slave)
+    _last_current = get_current(slave)
+    
     return _last_voltage * _last_current
 
 def get_period(slave: int = 20) -> float:

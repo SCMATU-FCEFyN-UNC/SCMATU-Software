@@ -179,6 +179,65 @@ const MonitoringPanel: React.FC = () => {
     try {
       setLoading(true);
       setMessage(null);
+
+      // Special handling for power: fetch voltage and current first
+      if (metric === "power") {
+        try {
+          // Fetch voltage first
+          const voltageResponse = await makeRequest(`/monitoring/voltage`, {
+            method: "GET",
+          });
+
+          if (!voltageResponse.data.success) {
+            setMessage(
+              `❌ ${voltageResponse.data.error || "Failed to fetch voltage"}`
+            );
+            return;
+          }
+
+          // Fetch current next
+          const currentResponse = await makeRequest(`/monitoring/current`, {
+            method: "GET",
+          });
+
+          if (!currentResponse.data.success) {
+            setMessage(
+              `❌ ${currentResponse.data.error || "Failed to fetch current"}`
+            );
+            return;
+          }
+
+          // Now fetch power (which will use the freshly fetched voltage and current)
+          const powerResponse = await makeRequest(`/monitoring/power`, {
+            method: "GET",
+          });
+
+          if (!powerResponse.data.success) {
+            setMessage(
+              `❌ ${powerResponse.data.error || "Failed to fetch power"}`
+            );
+            return;
+          }
+
+          // Update all three values
+          setData((prev) => ({
+            ...prev,
+            voltage: voltageResponse.data.voltage,
+            current: currentResponse.data.current,
+            power: powerResponse.data.power,
+          }));
+
+          setMessage("✅ Voltage, Current, and Power updated");
+        } catch (err) {
+          console.error("Failed to fetch power with dependencies:", err);
+          setMessage("❌ Failed to fetch power with dependencies");
+        } finally {
+          setLoading(false);
+        }
+        return; // Exit early since we handled power specially
+      }
+
+      // Original handling for other metrics
       const response = await makeRequest(`/monitoring/${metric}`, {
         method: "GET",
       });
