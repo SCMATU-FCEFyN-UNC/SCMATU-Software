@@ -4,6 +4,7 @@ import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
 import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 import ResonanceModal from "../ResonanceModal/ResonanceModal";
+import SignalPlot from "../SignalPlot/SignalPlot";
 
 interface PhaseData {
   seconds: number;
@@ -190,7 +191,7 @@ const MonitoringPanel: React.FC = () => {
 
           if (!voltageResponse.data.success) {
             setMessage(
-              `❌ ${voltageResponse.data.error || "Failed to fetch voltage"}`
+              `❌ ${voltageResponse.data.error || "Failed to fetch voltage"}`,
             );
             return;
           }
@@ -202,7 +203,7 @@ const MonitoringPanel: React.FC = () => {
 
           if (!currentResponse.data.success) {
             setMessage(
-              `❌ ${currentResponse.data.error || "Failed to fetch current"}`
+              `❌ ${currentResponse.data.error || "Failed to fetch current"}`,
             );
             return;
           }
@@ -214,7 +215,7 @@ const MonitoringPanel: React.FC = () => {
 
           if (!powerResponse.data.success) {
             setMessage(
-              `❌ ${powerResponse.data.error || "Failed to fetch power"}`
+              `❌ ${powerResponse.data.error || "Failed to fetch power"}`,
             );
             return;
           }
@@ -283,7 +284,7 @@ const MonitoringPanel: React.FC = () => {
   const renderFrequencyRow = (
     label: string,
     metrics: FrequencyMetrics | null,
-    isCollapsed: boolean = false
+    isCollapsed: boolean = false,
   ) => {
     // If collapsed and this is not "Best Overall", don't render
     if (isCollapsed && label !== "Best Overall") {
@@ -396,6 +397,15 @@ const MonitoringPanel: React.FC = () => {
       <div className="monitoring-header">
         <h2>Monitoring Panel</h2>
       </div>
+
+      {/* SIGNAL PLOT */}
+      <SignalPlot
+        voltage={data.voltage}
+        current={data.current}
+        phaseSeconds={data.phase?.seconds || null}
+        phaseDegrees={data.phase?.degrees || null}
+        period={data.period}
+      />
 
       {/* PHASE DIFFERENCE - Special row that stays together */}
       <div className="monitoring-fieldgroup phase-difference">
@@ -552,7 +562,7 @@ const MonitoringPanel: React.FC = () => {
           {/* Always show Best Overall */}
           {renderFrequencyRow(
             "Best Overall",
-            data.resonance?.best_overall ?? null
+            data.resonance?.best_overall ?? null,
           )}
 
           {/* Conditionally show Best Phase and Best Current */}
@@ -560,11 +570,11 @@ const MonitoringPanel: React.FC = () => {
             <>
               {renderFrequencyRow(
                 "Best Phase",
-                data.resonance?.best_phase ?? null
+                data.resonance?.best_phase ?? null,
               )}
               {renderFrequencyRow(
                 "Best Current",
-                data.resonance?.best_current ?? null
+                data.resonance?.best_current ?? null,
               )}
             </>
           )}
@@ -604,7 +614,13 @@ const MonitoringPanel: React.FC = () => {
 
       {/* MODAL */}
       {showResonanceModal && (
-        <ResonanceModal onClose={() => setShowResonanceModal(false)} />
+        <ResonanceModal
+          onClose={() => {
+            setShowResonanceModal(false);
+            // Auto-refresh all data
+            fetchAllMetrics();
+          }}
+        />
       )}
     </div>
   );
