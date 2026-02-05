@@ -420,6 +420,20 @@ def start_software_sweep(
 
     return {"success": True, "message": "Software sweep started"}
 
+def _is_valid_phase_ns(phase_ns):
+    """Check if phase value looks valid (not garbage)."""
+    if phase_ns is None:
+        return False
+    # Phase should be within reasonable range (less than 1 second in ns)
+    return abs(phase_ns) < 1e9
+
+def _is_valid_current_adc(current_adc):
+    """Check if current ADC value looks valid."""
+    if current_adc is None:
+        return False
+    # ADC should be in range 0-4095
+    return 0 <= current_adc <= 4095
+
 
 # -------------------------------------------------------------------------
 # Unified status endpoint
@@ -427,7 +441,8 @@ def start_software_sweep(
 def get_resonance_status(slave: int = 20):
     """Return resonance status for firmware or software mode."""
     if _sweep_state["running"] or _last_mode == "software":
-        return {
+        # For software mode, return state data
+        result = {
             "success": True,
             "status_code": _sweep_state["status_code"],
             "status_text": _sweep_state["status_text"],
@@ -440,15 +455,18 @@ def get_resonance_status(slave: int = 20):
             "plot_filepath": _sweep_state.get("plot_filepath"),
             "plot_open": _sweep_state.get("plot_open", False),
         }
+        return result
 
-    # For firmware mode, read and process the resonance data
+    # For firmware mode, read and validate the resonance data
     status = manager.read("input", slave, 9)
     
+    # Update status texts to include code 4
     status_texts = {
         0: "not obtained",
         1: "obtained successfully",
         2: "failed to obtain",
         3: "measurement in progress",
+        4: "software measurement (frequency only)",
     }
     status_text = status_texts.get(status, f"unknown ({status})")
     
@@ -461,111 +479,154 @@ def get_resonance_status(slave: int = 20):
         "best_current": None,
     }
     
-    # Only process data if measurement succeeded
+    # Handle status code 4 specially - software wrote only frequency
+    if status == 4:
+        # Read just the overall frequency registers
+        overall_hi = manager.read("input", slave, 10)
+        overall_lo = manager.read("input", slave, 11)
+        
+        if overall_hi is not None and overall_lo is not None:
+            overall_freq = (overall_hi << 16) | overall_lo
+            
+            result["best_overall"] = {
+                "frequency": overall_freq,
+                "phase_ns": None,
+                "phase_deg": None,
+                "current": None,
+                "current_a": None,
+            }
+        return result
+    
+    # Only process full data if firmware status says measurement succeeded (status 1)
     if status == 1:
-        # Reuse the same helper functions from monitoring_service.py
-        # You might want to move these to a shared utilities file
-        VREF = 4.485
-        
-        def decode_signed_phase(phase_raw):
-            if phase_raw is None:
-                return None
-            if phase_raw >= 32768:
-                phase_raw -= 65536
-            return float(phase_raw)
-        
-        def ns_to_deg(phase_ns, frequency_hz):
-            if phase_ns is None or frequency_hz is None or frequency_hz <= 0:
-                return None
-            period_ns = 1e9 / frequency_hz
-            phase_deg = (phase_ns / period_ns) * 360.0
-            return phase_deg
-        
-        def adc_to_current(adc_value, slave_id=slave):
-            if adc_value is None:
-                return None
-            
-            # Read calibration values
-            c_gain_raw = manager.read("holding", slave_id, 14)
-            r_shunt_raw = manager.read("holding", slave_id, 15)
-            
-            if c_gain_raw is None or r_shunt_raw is None:
-                return None
-            
-            c_gain = c_gain_raw / 1000.0
-            r_shunt = r_shunt_raw / 100.0
-            
-            if c_gain == 0 or r_shunt == 0:
-                return None
-            
-            amplified_vr = (adc_value / 4095.0) * VREF
-            vr_voltage = amplified_vr / c_gain
-            current_a = vr_voltage / r_shunt
-            
-            return current_a
-
-        # Read and process Best Overall Frequency
+        # ... [keep the existing code for status 1 processing] ...
+        # Read all registers first
         overall_hi = manager.read("input", slave, 10)
         overall_lo = manager.read("input", slave, 11)
         overall_phase_raw = manager.read("input", slave, 12)
         overall_current_raw = manager.read("input", slave, 13)
-
-        if not any(val is None for val in [overall_hi, overall_lo, overall_phase_raw, overall_current_raw]):
-            overall_freq = (overall_hi << 16) | overall_lo
-            phase_ns = decode_signed_phase(overall_phase_raw)
-            phase_deg = ns_to_deg(phase_ns, overall_freq)
-            current_a = adc_to_current(overall_current_raw)
-            
-            result["best_overall"] = {
-                "frequency": overall_freq,
-                "phase_ns": phase_ns,
-                "phase_deg": phase_deg,
-                "current": current_a,
-                "current_a": current_a,  # For compatibility
-            }
-
-        # Read and process Best Phase Frequency
+        
         phase_hi = manager.read("input", slave, 14)
         phase_lo = manager.read("input", slave, 15)
         phase_phase_raw = manager.read("input", slave, 16)
         phase_current_raw = manager.read("input", slave, 17)
-
-        if not any(val is None for val in [phase_hi, phase_lo, phase_phase_raw, phase_current_raw]):
-            phase_freq = (phase_hi << 16) | phase_lo
-            phase_ns = decode_signed_phase(phase_phase_raw)
-            phase_deg = ns_to_deg(phase_ns, phase_freq)
-            current_a = adc_to_current(phase_current_raw)
-            
-            result["best_phase"] = {
-                "frequency": phase_freq,
-                "phase_ns": phase_ns,
-                "phase_deg": phase_deg,
-                "current": current_a,
-                "current_a": current_a,  # For compatibility
-            }
-
-        # Read and process Best Current Frequency
+        
         current_hi = manager.read("input", slave, 18)
         current_lo = manager.read("input", slave, 19)
         current_phase_raw = manager.read("input", slave, 20)
         current_current_raw = manager.read("input", slave, 21)
-
-        if not any(val is None for val in [current_hi, current_lo, current_phase_raw, current_current_raw]):
-            current_freq = (current_hi << 16) | current_lo
-            phase_ns = decode_signed_phase(current_phase_raw)
-            phase_deg = ns_to_deg(phase_ns, current_freq)
-            current_a = adc_to_current(current_current_raw)
+        
+        # Check if we have at least the overall frequency
+        has_overall_freq = (overall_hi is not None and overall_lo is not None)
+        
+        if has_overall_freq:
+            overall_freq = (overall_hi << 16) | overall_lo
             
-            result["best_current"] = {
-                "frequency": current_freq,
-                "phase_ns": phase_ns,
-                "phase_deg": phase_deg,
-                "current": current_a,
-                "current_a": current_a,  # For compatibility
-            }
+            # Validate phase and current data
+            overall_phase_valid = _is_valid_phase_ns(overall_phase_raw)
+            overall_current_valid = _is_valid_current_adc(overall_current_raw)
+            
+            # If phase/current look invalid, downgrade the status
+            if not (overall_phase_valid and overall_current_valid):
+                result["status_code"] = 4  # Change to software measurement status
+                result["status_text"] = "software measurement (frequency only)"
+                
+                # Return the frequency but with null phase/current
+                result["best_overall"] = {
+                    "frequency": overall_freq,
+                    "phase_ns": None,
+                    "phase_deg": None,
+                    "current": None,
+                    "current_a": None,
+                }
+                return result
+            
+            # Otherwise, we have valid firmware data - process it
+            VREF = 4.485
+            
+            def decode_signed_phase(phase_raw):
+                if phase_raw is None:
+                    return None
+                if phase_raw >= 32768:
+                    phase_raw -= 65536
+                return float(phase_raw)
+            
+            def ns_to_deg(phase_ns, frequency_hz):
+                if phase_ns is None or frequency_hz is None or frequency_hz <= 0:
+                    return None
+                period_ns = 1e9 / frequency_hz
+                phase_deg = (phase_ns / period_ns) * 360.0
+                return phase_deg
+            
+            def adc_to_current(adc_value, slave_id=slave):
+                if adc_value is None:
+                    return None
+                
+                # Read calibration values
+                c_gain_raw = manager.read("holding", slave_id, 14)
+                r_shunt_raw = manager.read("holding", slave_id, 15)
+                
+                if c_gain_raw is None or r_shunt_raw is None:
+                    return None
+                
+                c_gain = c_gain_raw / 1000.0
+                r_shunt = r_shunt_raw / 100.0
+                
+                if c_gain == 0 or r_shunt == 0:
+                    return None
+                
+                amplified_vr = (adc_value / 4095.0) * VREF
+                vr_voltage = amplified_vr / c_gain
+                current_a = vr_voltage / r_shunt
+                
+                return current_a
+
+            # Process Best Overall Frequency
+            if not any(val is None for val in [overall_hi, overall_lo, overall_phase_raw, overall_current_raw]):
+                overall_freq = (overall_hi << 16) | overall_lo
+                phase_ns = decode_signed_phase(overall_phase_raw)
+                phase_deg = ns_to_deg(phase_ns, overall_freq)
+                current_a = adc_to_current(overall_current_raw)
+                
+                result["best_overall"] = {
+                    "frequency": overall_freq,
+                    "phase_ns": phase_ns,
+                    "phase_deg": phase_deg,
+                    "current": current_a,
+                    "current_a": current_a,
+                }
+
+            # Process Best Phase Frequency
+            if not any(val is None for val in [phase_hi, phase_lo, phase_phase_raw, phase_current_raw]):
+                phase_freq = (phase_hi << 16) | phase_lo
+                phase_ns = decode_signed_phase(phase_phase_raw)
+                phase_deg = ns_to_deg(phase_ns, phase_freq)
+                current_a = adc_to_current(phase_current_raw)
+                
+                result["best_phase"] = {
+                    "frequency": phase_freq,
+                    "phase_ns": phase_ns,
+                    "phase_deg": phase_deg,
+                    "current": current_a,
+                    "current_a": current_a,
+                }
+
+            # Process Best Current Frequency
+            if not any(val is None for val in [current_hi, current_lo, current_phase_raw, current_current_raw]):
+                current_freq = (current_hi << 16) | current_lo
+                phase_ns = decode_signed_phase(current_phase_raw)
+                phase_deg = ns_to_deg(phase_ns, current_freq)
+                current_a = adc_to_current(current_current_raw)
+                
+                result["best_current"] = {
+                    "frequency": current_freq,
+                    "phase_ns": phase_ns,
+                    "phase_deg": phase_deg,
+                    "current": current_a,
+                    "current_a": current_a,
+                }
     
     return result
-
 
 def _update_firmware_with_external_result(best_overall_freq: int, slave: int = 20):
     """Write externally obtained resonance frequency to firmware."""
