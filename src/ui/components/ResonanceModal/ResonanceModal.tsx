@@ -151,7 +151,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         setSaveResults(false);
       }
       setMessage(
-        "❌ Error selecting folder. Keeping previous folder if available."
+        "❌ Error selecting folder. Keeping previous folder if available.",
       );
     } finally {
       setIsSelectingFolder(false);
@@ -204,15 +204,15 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           result.phase !== undefined
             ? result.phase
             : result.phase_ns !== undefined
-            ? result.phase_ns
-            : null,
+              ? result.phase_ns
+              : null,
         phase_deg: result.phase_deg !== undefined ? result.phase_deg : null,
         current:
           result.current !== undefined
             ? result.current
             : result.current_a !== undefined
-            ? result.current_a
-            : null,
+              ? result.current_a
+              : null,
       };
     };
 
@@ -285,7 +285,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         } catch (monitoringErr) {
           console.error(
             "Error fetching from monitoring endpoint:",
-            monitoringErr
+            monitoringErr,
           );
         }
       }
@@ -332,7 +332,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     prev
                       ? prev +
                         "\n📊 Plot window is open. Close it manually when done."
-                      : "📊 Plot window is open. Close it manually when done."
+                      : "📊 Plot window is open. Close it manually when done.",
                   );
                 }
 
@@ -344,7 +344,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   setMessage((prev) =>
                     prev
                       ? prev + `\n🖼️ Plot saved to: ${otherData.plot_filepath}`
-                      : `🖼️ Plot saved to: ${otherData.plot_filepath}`
+                      : `🖼️ Plot saved to: ${otherData.plot_filepath}`,
                   );
                   plotSavedRef.current = true;
                 }
@@ -352,14 +352,14 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 // Add firmware update info
                 if (!firmwareUpdatedRef.current) {
                   setFirmwareUpdateStatus(
-                    "Updating firmware with resonance frequency..."
+                    "Updating firmware with resonance frequency...",
                   );
 
                   // The backend should have already updated the firmware automatically
                   // but we can display a confirmation message after a delay
                   setTimeout(() => {
                     setFirmwareUpdateStatus(
-                      "✓ Firmware updated with resonance frequency"
+                      "✓ Firmware updated with resonance frequency",
                     );
                   }, 1000);
                   firmwareUpdatedRef.current = true;
@@ -393,20 +393,20 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             save_plot: savePlot,
                           },
                         },
-                      }
+                      },
                     );
 
                     if (saveResponse.data && saveResponse.data.success) {
                       setMessage(
                         (prev) =>
                           prev +
-                          `\n📁 Results saved to: ${saveResponse.data.filename}`
+                          `\n📁 Results saved to: ${saveResponse.data.filename}`,
                       );
                     }
                   } catch (saveErr) {
                     console.error("Error saving results:", saveErr);
                     setMessage(
-                      (prev) => prev + "\n❌ Failed to save results to CSV."
+                      (prev) => prev + "\n❌ Failed to save results to CSV.",
                     );
                   }
                   resultsSavedRef.current = true;
@@ -414,7 +414,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               }
 
               setMessage((prev) =>
-                prev ? prev + "\n" + successMessage : successMessage
+                prev ? prev + "\n" + successMessage : successMessage,
               );
 
               // For firmware mode, make sure we have the latest results
@@ -575,7 +575,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       phase_ns: number | null;
       phase_deg: number | null;
       current: number | null;
-    } | null
+    } | null,
   ) => (
     <div className="resonance-frequency-card">
       <h4>{title}</h4>
@@ -795,8 +795,8 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   {isSelectingFolder
                     ? "Selecting..."
                     : saveFolderPath
-                    ? "Change Save Folder"
-                    : "Select Save Folder"}
+                      ? "Change Save Folder"
+                      : "Select Save Folder"}
                 </button>
 
                 {/* Always show folder path when we have one, regardless of checkbox state */}
@@ -828,12 +828,12 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     if (!newSaveResults) {
                       // Keep folder path for next time
                       setMessage(
-                        "⚠️ Save disabled but folder will be remembered."
+                        "⚠️ Save disabled but folder will be remembered.",
                       );
                     } else if (newSaveResults && !saveFolderPath) {
                       // If checking without a folder, show warning but don't auto-open
                       setMessage(
-                        "⚠️ Please select a save folder by clicking the button above."
+                        "⚠️ Please select a save folder by clicking the button above.",
                       );
                     }
                   }}
@@ -857,7 +857,7 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     // If enabling save plot but no folder is selected
                     if (newSavePlot && !saveFolderPath) {
                       setMessage(
-                        "⚠️ Please select a save folder to save the plot."
+                        "⚠️ Please select a save folder to save the plot.",
                       );
                     }
                   }}
@@ -897,12 +897,12 @@ const ResonanceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <div className="resonance-frequency-cards-grid">
             {renderFrequencyCard(
               "Best Overall",
-              obtainedFrequencies.best_overall
+              obtainedFrequencies.best_overall,
             )}
             {renderFrequencyCard("Best Phase", obtainedFrequencies.best_phase)}
             {renderFrequencyCard(
               "Best Current",
-              obtainedFrequencies.best_current
+              obtainedFrequencies.best_current,
             )}
           </div>
         </div>
