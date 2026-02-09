@@ -1,0 +1,84 @@
+// MagnitudePlots.model.scss
+@use '../../styles/mixins' as m;
+@use '../../styles/variables' as v;
+
+.magnitude-plots-container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 2rem;
+  
+  .plots-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1.5rem;
+    background: #f9f9f9;
+    border: 2px dashed #ddd;
+    border-radius: 10px;
+    text-align: center;
+    min-height: 300px;
+    
+    .placeholder-title {
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: #666;
+      margin-bottom: 0.75rem;
+    }
+    
+    .placeholder-message {
+      font-size: 1rem;
+      color: #888;
+      line-height: 1.5;
+      max-width: 400px;
+    }
+  }
+  
+  .plots-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    
+    @include m.desktop_size {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+    
+    .plot-item {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      
+      // Ensure both plots have consistent styling
+      .signal-plot-container,
+      .power-triangle-container {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        
+        .chart-wrapper,
+        .plot-wrapper {
+          width: 100%;
+          box-sizing: border-box;
+        }
+      }
+      
+      // Power triangle specific adjustments for responsive layout
+      &.power-triangle {
+        .power-triangle-container {
+          .chart-wrapper {
+            @include m.desktop_size {
+              height: 300px; // Match SignalPlot height on desktop
+            }
+          }
+        }
+      }
+    }
+  }
+}

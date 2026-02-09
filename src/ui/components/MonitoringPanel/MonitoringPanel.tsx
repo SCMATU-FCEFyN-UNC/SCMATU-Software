@@ -4,7 +4,7 @@ import { useBackendRequest } from "../../utils/backendRequests";
 import { useConnection } from "../../context/ConnectionStatusProvider";
 import { useResonanceStatus } from "../../context/ResonanceStatusProvider";
 import ResonanceModal from "../ResonanceModal/ResonanceModal";
-import SignalPlot from "../SignalPlot/SignalPlot";
+import MagnitudePlots from "../MagnitudePlots/MagnitudePlots";
 
 interface PhaseData {
   seconds: number;
@@ -397,16 +397,14 @@ const MonitoringPanel: React.FC = () => {
       <div className="monitoring-header">
         <h2>Monitoring Panel</h2>
       </div>
-
-      {/* SIGNAL PLOT */}
-      <SignalPlot
+      <MagnitudePlots
         voltage={data.voltage}
         current={data.current}
         phaseSeconds={data.phase?.seconds || null}
         phaseDegrees={data.phase?.degrees || null}
         period={data.period}
+        power={data.power}
       />
-
       {/* PHASE DIFFERENCE - Special row that stays together */}
       <div className="monitoring-fieldgroup phase-difference">
         <label>Phase Difference</label>
@@ -454,7 +452,6 @@ const MonitoringPanel: React.FC = () => {
           Refresh
         </button>
       </div>
-
       {/* MONITORING FIELDS - Grid layout */}
       <div className="monitoring-fields">
         {/* VOLTAGE */}
@@ -548,7 +545,6 @@ const MonitoringPanel: React.FC = () => {
           </button>
         </div>
       </div>
-
       {/* RESONANCE FREQUENCY - Collapsible */}
       <div className="monitoring-fieldgroup resonance-section">
         <div className="resonance-header">
@@ -594,7 +590,6 @@ const MonitoringPanel: React.FC = () => {
           Refresh
         </button>
       </div>
-
       {/* ACTION BUTTONS */}
       <div className="monitoring-actions">
         <button onClick={fetchAllMetrics} disabled={isDisabled}>
@@ -607,11 +602,9 @@ const MonitoringPanel: React.FC = () => {
           📊 Measure Resonance
         </button>
       </div>
-
       {/* MESSAGES */}
       {!connected && <p className="warning">⚠️ Connect to a device first</p>}
       {message && <p className="message">{message}</p>}
-
       {/* MODAL */}
       {showResonanceModal && (
         <ResonanceModal
