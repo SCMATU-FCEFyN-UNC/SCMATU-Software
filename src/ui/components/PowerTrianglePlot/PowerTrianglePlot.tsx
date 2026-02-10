@@ -139,8 +139,18 @@ const PowerTrianglePlot: React.FC<PowerTrianglePlotProps> = ({
   };
 
   // Usable power percentage: how much of S is real P (|P|/S)
-  const percentUsable =
-    effectiveP != null ? (Math.abs(effectiveP) / calculatedS) * 100 : null;
+  // For better precision, compute directly from phase angle when available
+  const percentUsable = useMemo(() => {
+    if (phaseDegrees != null) {
+      // Most precise: use cosine of phase angle directly
+      const phiRad = (phaseDegrees * Math.PI) / 180;
+      return Math.abs(Math.cos(phiRad)) * 100;
+    } else if (effectiveP != null && calculatedS > 0) {
+      // Fallback: use P/S ratio
+      return (Math.abs(effectiveP) / calculatedS) * 100;
+    }
+    return null;
+  }, [phaseDegrees, effectiveP, calculatedS]);
 
   // Display S calculated from P and Q to ensure consistency
   const displayS_mVA = calculatedS * 1000;
@@ -472,7 +482,7 @@ const PowerTrianglePlot: React.FC<PowerTrianglePlotProps> = ({
         <div>
           <span className="value">Usable (%)</span>
           <span className="value">
-            {percentUsable != null ? percentUsable.toFixed(1) + "%" : "—"}
+            {percentUsable != null ? percentUsable.toFixed(3) + "%" : "—"}
           </span>
         </div>
       </div>
