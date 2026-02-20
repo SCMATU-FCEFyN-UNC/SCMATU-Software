@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from flask import Flask
-from backend.routes.connection import serial_bp
+from backend.routes.connection_routes import serial_bp
 from backend.services.connection_manager import manager
 
 class TestConnectionRoutes:
@@ -31,10 +31,10 @@ class TestConnectionRoutes:
             mock_connect.assert_called_once_with(
                 port="COM3",
                 baudrate=19200,
+                bytesize=8,  # Default value
                 parity="E",
-                stopbits=1,
-                bytesize=8,
-                timeout=1.0,
+                stopbits=1,  # Default value
+                timeout=1.0,  # Default value
             )
 
     def test_connect_port_with_params(self, client):
@@ -58,7 +58,7 @@ class TestConnectionRoutes:
         """Test POST /connect failed connection returns 500."""
         test_data = {"port": "COM3"}
         
-        with patch.object(manager, 'connect', return_value=False) as mock_connect:
+        with patch.object(manager, 'connect', return_value=False):
             response = client.post("/connect", json=test_data)
             assert response.status_code == 500
             assert response.json == {"success": False}

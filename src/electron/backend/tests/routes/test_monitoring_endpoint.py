@@ -1,7 +1,16 @@
 import pytest
 from unittest.mock import patch
 from flask import Flask
-from backend.routes.monitoring import monitoring_bp  # Correct import path
+from backend.routes.monitoring_routes import monitoring_bp
+
+
+@pytest.fixture
+def client():
+    """Flask test client fixture with registered monitoring_bp blueprint."""
+    app = Flask(__name__)
+    app.register_blueprint(monitoring_bp, url_prefix='/')
+    return app.test_client()
+
 
 class TestMonitoringEndpoints:
     """Test suite for monitoring endpoints"""
@@ -34,12 +43,12 @@ class TestMonitoringEndpoints:
             },
         }
 
-        with patch("backend.routes.monitoring.get_phase", return_value=mock_data["phase"]) as mock_phase:
-            with patch("backend.routes.monitoring.get_voltage", return_value=mock_data["voltage"]) as mock_voltage:
-                with patch("backend.routes.monitoring.get_current", return_value=mock_data["current"]) as mock_current:
-                    with patch("backend.routes.monitoring.get_power", return_value=mock_data["power"]) as mock_power:
-                        with patch("backend.routes.monitoring.get_period", return_value=mock_data["period"]) as mock_period:
-                            with patch("backend.routes.monitoring.get_resonance_frequency", return_value=mock_data["resonance"]) as mock_resonance:
+        with patch("backend.routes.monitoring_routes.get_phase", return_value=mock_data["phase"]) as mock_phase:
+            with patch("backend.routes.monitoring_routes.get_voltage", return_value=mock_data["voltage"]) as mock_voltage:
+                with patch("backend.routes.monitoring_routes.get_current", return_value=mock_data["current"]) as mock_current:
+                    with patch("backend.routes.monitoring_routes.get_power", return_value=mock_data["power"]) as mock_power:
+                        with patch("backend.routes.monitoring_routes.get_period", return_value=mock_data["period"]) as mock_period:
+                            with patch("backend.routes.monitoring_routes.get_resonance_frequency", return_value=mock_data["resonance"]) as mock_resonance:
                                 response = client.get("/monitoring")
                                 
                                 assert response.status_code == 200
@@ -57,12 +66,12 @@ class TestMonitoringEndpoints:
 
     def test_get_all_monitoring_failure(self, client):
         # Mock ALL monitoring service functions to avoid connection issues
-        with patch("backend.routes.monitoring.get_phase") as mock_phase:
-            with patch("backend.routes.monitoring.get_voltage") as mock_voltage:
-                with patch("backend.routes.monitoring.get_current") as mock_current:
-                    with patch("backend.routes.monitoring.get_power") as mock_power:
-                        with patch("backend.routes.monitoring.get_period") as mock_period:
-                            with patch("backend.routes.monitoring.get_resonance_frequency") as mock_resonance:
+        with patch("backend.routes.monitoring_routes.get_phase") as mock_phase:
+            with patch("backend.routes.monitoring_routes.get_voltage") as mock_voltage:
+                with patch("backend.routes.monitoring_routes.get_current") as mock_current:
+                    with patch("backend.routes.monitoring_routes.get_power") as mock_power:
+                        with patch("backend.routes.monitoring_routes.get_period") as mock_period:
+                            with patch("backend.routes.monitoring_routes.get_resonance_frequency") as mock_resonance:
                                 # Make the first function called raise the exception
                                 mock_phase.side_effect = Exception("Failed to read phase")
                                 
@@ -77,7 +86,7 @@ class TestMonitoringEndpoints:
 
     def test_get_single_monitoring_phase(self, client):
         phase_data = {"seconds": 0.0000045, "degrees": 81.0}
-        with patch("backend.routes.monitoring.get_phase", return_value=phase_data) as mock_func:
+        with patch("backend.routes.monitoring_routes.get_phase", return_value=phase_data) as mock_func:
             response = client.get("/monitoring/phase")
             
             assert response.status_code == 200
@@ -87,7 +96,7 @@ class TestMonitoringEndpoints:
             mock_func.assert_called_once()
 
     def test_get_single_monitoring_voltage(self, client):
-        with patch("backend.routes.monitoring.get_voltage", return_value=220.0) as mock_func:
+        with patch("backend.routes.monitoring_routes.get_voltage", return_value=220.0) as mock_func:
             response = client.get("/monitoring/voltage")
             
             assert response.status_code == 200
@@ -97,7 +106,7 @@ class TestMonitoringEndpoints:
             mock_func.assert_called_once()
 
     def test_get_single_monitoring_current(self, client):
-        with patch("backend.routes.monitoring.get_current", return_value=5.0) as mock_func:
+        with patch("backend.routes.monitoring_routes.get_current", return_value=5.0) as mock_func:
             response = client.get("/monitoring/current")
             
             assert response.status_code == 200
@@ -107,7 +116,7 @@ class TestMonitoringEndpoints:
             mock_func.assert_called_once()
 
     def test_get_single_monitoring_power(self, client):
-        with patch("backend.routes.monitoring.get_power", return_value=1100.0) as mock_func:
+        with patch("backend.routes.monitoring_routes.get_power", return_value=1100.0) as mock_func:
             response = client.get("/monitoring/power")
             
             assert response.status_code == 200
@@ -117,7 +126,7 @@ class TestMonitoringEndpoints:
             mock_func.assert_called_once()
 
     def test_get_single_monitoring_period(self, client):
-        with patch("backend.routes.monitoring.get_period", return_value=0.02) as mock_func:
+        with patch("backend.routes.monitoring_routes.get_period", return_value=0.02) as mock_func:
             response = client.get("/monitoring/period")
             
             assert response.status_code == 200
@@ -146,7 +155,7 @@ class TestMonitoringEndpoints:
                 "current": 3000
             }
         }
-        with patch("backend.routes.monitoring.get_resonance_frequency", return_value=resonance_data) as mock_func:
+        with patch("backend.routes.monitoring_routes.get_resonance_frequency", return_value=resonance_data) as mock_func:
             response = client.get("/monitoring/resonance")
             
             assert response.status_code == 200
@@ -164,7 +173,7 @@ class TestMonitoringEndpoints:
         assert "Unsupported metric: invalid_metric" in data["error"]
 
     def test_get_single_monitoring_failure(self, client):
-        with patch("backend.routes.monitoring.get_voltage") as mock_func:
+        with patch("backend.routes.monitoring_routes.get_voltage") as mock_func:
             mock_func.side_effect = Exception("Voltage read failed")
             
             response = client.get("/monitoring/voltage")
@@ -178,12 +187,12 @@ class TestMonitoringEndpoints:
     def test_get_all_monitoring_partial_failure(self, client):
         """Test when some monitoring functions work but others fail"""
         phase_data = {"seconds": 0.0000045, "degrees": 81.0}
-        with patch("backend.routes.monitoring.get_phase", return_value=phase_data) as mock_phase:
-            with patch("backend.routes.monitoring.get_voltage") as mock_voltage:
-                with patch("backend.routes.monitoring.get_current", return_value=5.0) as mock_current:
-                    with patch("backend.routes.monitoring.get_power") as mock_power:
-                        with patch("backend.routes.monitoring.get_period") as mock_period:
-                            with patch("backend.routes.monitoring.get_resonance_frequency") as mock_resonance:
+        with patch("backend.routes.monitoring_routes.get_phase", return_value=phase_data) as mock_phase:
+            with patch("backend.routes.monitoring_routes.get_voltage") as mock_voltage:
+                with patch("backend.routes.monitoring_routes.get_current", return_value=5.0) as mock_current:
+                    with patch("backend.routes.monitoring_routes.get_power") as mock_power:
+                        with patch("backend.routes.monitoring_routes.get_period") as mock_period:
+                            with patch("backend.routes.monitoring_routes.get_resonance_frequency") as mock_resonance:
                                 # Only voltage fails
                                 mock_voltage.side_effect = Exception("Voltage sensor offline")
                                 # Other functions return successfully
@@ -212,12 +221,3 @@ class TestMonitoringEndpoints:
         # We can't easily access the mapping directly, but we can verify through the tests
         # that all these metrics work correctly
         assert len(expected_metrics) == 6  # Should match the number of metrics we test
-
-
-@pytest.fixture
-def client():
-    """Flask test client fixture with registered monitoring_bp blueprint."""
-    app = Flask(__name__)
-    app.register_blueprint(monitoring_bp, url_prefix='/')
-    
-    return app.test_client()

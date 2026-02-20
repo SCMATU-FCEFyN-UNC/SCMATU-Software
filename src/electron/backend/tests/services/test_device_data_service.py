@@ -128,6 +128,11 @@ class TestDeviceDataService:
         # Note: int(round(2.5)) = 2 (bankers rounding)
         self.mock_manager.write.assert_called_once_with("holding", 20, 13, 2)
     
+    def test_set_voltage_adecuator_gain_invalid(self):
+        """Test setting invalid voltage gain."""
+        with pytest.raises(ValueError, match="Voltage adecuator gain must be non-negative"):
+            DeviceDataService.set_voltage_adecuator_gain(-1.0)
+    
     def test_set_current_adecuator_gain(self):
         """Test setting current adecuator gain."""
         # Arrange
@@ -141,6 +146,11 @@ class TestDeviceDataService:
         assert result == {"success": True, "current_gain": gain}
         # Note: int(round(3.2)) = 3
         self.mock_manager.write.assert_called_once_with("holding", 20, 14, 3)
+    
+    def test_set_current_adecuator_gain_invalid(self):
+        """Test setting invalid current gain."""
+        with pytest.raises(ValueError, match="Current adecuator gain must be non-negative"):
+            DeviceDataService.set_current_adecuator_gain(-1.0)
     
     def test_set_phase_curr_max_distance(self):
         """Test setting phase current max distance."""
@@ -156,6 +166,11 @@ class TestDeviceDataService:
         # Note: int(round(15.7)) = 16
         self.mock_manager.write.assert_called_once_with("holding", 20, 17, 16)
     
+    def test_set_phase_curr_max_distance_invalid(self):
+        """Test setting invalid phase current max distance."""
+        with pytest.raises(ValueError, match="Max distance must be non-negative"):
+            DeviceDataService.set_phase_curr_max_distance(-1.0)
+    
     def test_set_auto_freq_sweep_width(self):
         """Test setting auto frequency sweep width."""
         # Arrange
@@ -169,6 +184,11 @@ class TestDeviceDataService:
         assert result == {"success": True, "sweep_width": width}
         # Note: int(round(20.3)) = 20
         self.mock_manager.write.assert_called_once_with("holding", 20, 18, 20)
+    
+    def test_set_auto_freq_sweep_width_invalid(self):
+        """Test setting invalid auto frequency sweep width."""
+        with pytest.raises(ValueError, match="Frequency sweep width must be non-negative"):
+            DeviceDataService.set_auto_freq_sweep_width(-1.0)
     
     def test_set_closed_loop_control_enable(self):
         """Test enabling/disabling closed loop control."""
@@ -201,6 +221,9 @@ class TestDeviceDataService:
         """Test setting invalid closed loop control period."""
         with pytest.raises(ValueError, match="Control period must be a positive integer"):
             DeviceDataService.set_closed_loop_control_period(0)
+        
+        with pytest.raises(ValueError, match="Control period must be a positive integer"):
+            DeviceDataService.set_closed_loop_control_period(-5)
     
     def test_set_serial_number_password(self):
         """Test setting serial number password."""
@@ -213,7 +236,7 @@ class TestDeviceDataService:
         
         # Assert
         assert result == {"success": True, "password_written": True}
-        self.mock_manager.write.assert_called_once_with("holding", 20, 22, password)
+        self.mock_manager.write.assert_called_once_with("holding", 20, 24, password)
     
     def test_set_serial_number_password_none(self):
         """Test setting None password."""
@@ -231,7 +254,7 @@ class TestDeviceDataService:
         
         # Assert
         assert result == {"success": True, "serial_number": 123456789}
-        self.mock_manager.write.assert_called_once_with("holding", 20, 21, 123456789)
+        self.mock_manager.write.assert_called_once_with("holding", 20, 23, 123456789)
     
     def test_write_serial_number_invalid(self):
         """Test writing invalid serial number."""
@@ -249,7 +272,7 @@ class TestDeviceDataService:
         
         # Assert
         assert result == expected_status
-        self.mock_manager.read.assert_called_once_with("holding", 20, 23)
+        self.mock_manager.read.assert_called_once_with("holding", 20, 25)
     
     def test_get_serial_number_write_status_failure(self):
         """Test getting serial number write status when None is returned."""
@@ -422,11 +445,14 @@ class TestDeviceDataService:
         self.mock_manager.read.return_value = 1
         result = DeviceDataService.get_closed_loop_control_enable()
         assert result is True
+        self.mock_manager.read.assert_called_with("holding", 20, 19)
         
         # Test disabled
+        self.mock_manager.read.reset_mock()
         self.mock_manager.read.return_value = 0
         result = DeviceDataService.get_closed_loop_control_enable()
         assert result is False
+        self.mock_manager.read.assert_called_with("holding", 20, 19)
     
     def test_get_closed_loop_control_enable_failure(self):
         """Test getting closed loop control enable when None is returned."""
