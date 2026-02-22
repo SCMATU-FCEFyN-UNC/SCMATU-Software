@@ -49,17 +49,16 @@ describe("MonitoringPanel", () => {
 
     expect(screen.getByText("Monitoring Panel")).toBeInTheDocument();
 
-    // There are 15 text inputs: 2 (phase) + 1 (voltage) + 1 (current) + 1 (power)
-    // + 1 (period) + 9 (resonance grid: 3 rows * 3 columns) = 15
+    // There are 11 text inputs: 2 (phase time + angle) + 1 (voltage) + 1 (current)
+    // + 1 (power) + 1 (period) + 5 (resonance best overall: frequency + phase mobile + current mobile + phase desktop + current desktop)
     const inputs = screen.getAllByRole("textbox");
-    expect(inputs).toHaveLength(15);
+    expect(inputs).toHaveLength(11);
 
     // Check that we have 5 unit selectors
     const selectors = screen.getAllByRole("combobox");
     expect(selectors).toHaveLength(5);
 
-    // The first 6 inputs (phase, voltage, current, power, period) should be empty
-    // and the last 9 (resonance grid) should show "-" when no data is loaded.
+    // The first 6 inputs should be empty, and the last 5 (resonance grid) should show "-" when no data is loaded.
     inputs.slice(0, 6).forEach((input) => expect(input).toHaveValue(""));
     inputs.slice(6).forEach((input) => expect(input).toHaveValue("-"));
 
@@ -79,7 +78,8 @@ describe("MonitoringPanel", () => {
         status_text: "obtained successfully",
         best_overall: {
           frequency: 50000,
-          phase: 10,
+          phase_ns: null,
+          phase_deg: 10,
           current: 5.2,
         },
         best_phase: null,
@@ -118,10 +118,10 @@ describe("MonitoringPanel", () => {
 
     // resonance frequencies are displayed with locale formatting
     expect(
-      screen.getByDisplayValue((50000).toLocaleString())
+      screen.getByDisplayValue((50000).toLocaleString()),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Status: obtained successfully")
+      screen.getByText("Status: obtained successfully"),
     ).toBeInTheDocument();
     expect(screen.getByText("✅ Monitoring data updated")).toBeInTheDocument();
   });
@@ -187,7 +187,8 @@ describe("MonitoringPanel", () => {
           status_text: "obtained successfully",
           best_overall: {
             frequency: 45000,
-            phase: 8,
+            phase_ns: null,
+            phase_deg: 8,
             current: 4.8,
           },
           best_phase: null,
@@ -212,13 +213,13 @@ describe("MonitoringPanel", () => {
     });
 
     expect(
-      screen.getByDisplayValue((45000).toLocaleString())
+      screen.getByDisplayValue((45000).toLocaleString()),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Status: obtained successfully")
+      screen.getByText("Status: obtained successfully"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("✅ Resonance frequency updated")
+      screen.getByText("✅ Resonance frequency updated"),
     ).toBeInTheDocument();
   });
 
@@ -325,7 +326,7 @@ describe("MonitoringPanel", () => {
       });
 
       expect(
-        screen.getByText("⚠️ Connect to a device first")
+        screen.getByText("⚠️ Connect to a device first"),
       ).toBeInTheDocument();
     });
 
@@ -364,7 +365,8 @@ describe("MonitoringPanel", () => {
         status_text: "measured",
         best_overall: {
           frequency: 1234567,
-          phase: 90,
+          phase_ns: null,
+          phase_deg: 90,
           current: 6.5,
         },
         best_phase: null,
@@ -395,7 +397,7 @@ describe("MonitoringPanel", () => {
       expect(screen.getByDisplayValue("152.415")).toBeInTheDocument();
       expect(screen.getByDisplayValue("1.230e-4")).toBeInTheDocument();
       expect(
-        screen.getByDisplayValue((1234567).toLocaleString())
+        screen.getByDisplayValue((1234567).toLocaleString()),
       ).toBeInTheDocument();
     });
 
@@ -407,9 +409,9 @@ describe("MonitoringPanel", () => {
       render(<MonitoringPanel />);
     });
 
-    // There are 15 text boxes; the first 6 are empty, last 9 show '-' placeholders.
+    // There are 11 text boxes; the first 6 are empty, last 5 show '-' placeholders.
     const inputs = screen.getAllByRole("textbox");
-    expect(inputs).toHaveLength(15);
+    expect(inputs).toHaveLength(11);
     inputs.slice(0, 6).forEach((i) => expect(i).toHaveValue(""));
     inputs.slice(6).forEach((i) => expect(i).toHaveValue("-"));
   });
@@ -450,7 +452,8 @@ describe("MonitoringPanel", () => {
         status_text: "obtained successfully",
         best_overall: {
           frequency: 50000,
-          phase: 10,
+          phase_ns: null,
+          phase_deg: 10,
           current: 5.2,
         },
         best_phase: null,
@@ -500,6 +503,18 @@ describe("MonitoringPanel", () => {
     const mockDataZero = {
       ...mockData,
       phase: { seconds: 0, degrees: 0 },
+      resonance: {
+        status_code: 200,
+        status_text: "obtained successfully",
+        best_overall: {
+          frequency: 50000,
+          phase_ns: null,
+          phase_deg: 10,
+          current: 5.2,
+        },
+        best_phase: null,
+        best_current: null,
+      },
     };
 
     mockMakeRequest.mockResolvedValueOnce({
@@ -530,7 +545,8 @@ describe("MonitoringPanel", () => {
         status_text: "obtained successfully",
         best_overall: {
           frequency: 50000,
-          phase: 10,
+          phase_ns: null,
+          phase_deg: 10,
           current: 5.2,
         },
         best_phase: null,

@@ -51,22 +51,23 @@ describe("ControlPanel", () => {
       });
 
       expect(screen.getByText("Control Panel")).toBeInTheDocument();
-      expect(
-        screen.getByText("⚠️ Connect to a device first")
-      ).toBeInTheDocument();
+
+      // Warning message should be visible
+      const warningElements = screen.getAllByText(
+        "⚠️ Connect to a device first",
+      );
+      expect(warningElements.length).toBeGreaterThan(0);
 
       // Check initial values
-      expect(screen.getByDisplayValue("60000")).toBeInTheDocument();
-      expect(screen.getByDisplayValue("50")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("60000")).toBeInTheDocument(); // frequency
+      expect(screen.getByDisplayValue("50")).toBeInTheDocument(); // power
 
-      // There are two inputs with display value "100" (On Time and Off Time)
+      // Use getAllByDisplayValue for the two 100 values
       const hundredInputs = screen.getAllByDisplayValue("100");
-      expect(hundredInputs.length).toBeGreaterThanOrEqual(2);
+      expect(hundredInputs.length).toBe(2); // on time and off time
 
-      // Ensure both On Time and Off Time exist via spinbutton positions
-      const spinbuttons = screen.getAllByRole("spinbutton");
-      expect(spinbuttons[2]).toHaveValue(100);
-      expect(spinbuttons[3]).toHaveValue(100);
+      expect(screen.getByText("Enabled")).toBeInTheDocument(); // transducer enabled
+      expect(screen.getByText("Disabled")).toBeInTheDocument(); // closed loop disabled
     });
 
     it("disables all inputs when disconnected", async () => {
@@ -77,6 +78,10 @@ describe("ControlPanel", () => {
       const frequencyInput = screen.getByDisplayValue("60000");
       const powerInput = screen.getByDisplayValue("50");
       const spinbuttons = screen.getAllByRole("spinbutton");
+
+      // Should have 4 spinbuttons: frequency, power, onTime, offTime
+      expect(spinbuttons.length).toBe(4);
+
       const onTimeInput = spinbuttons[2];
       const offTimeInput = spinbuttons[3];
 
@@ -91,13 +96,12 @@ describe("ControlPanel", () => {
         render(<ControlPanel />);
       });
 
-      const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const getButton = screen.getByRole("button", { name: /get/i });
+      // There should be many buttons: Set (x4), Get, Enable/Disable Transducer, Enable/Disable Closed Loop, Update
+      const buttons = screen.getAllByRole("button");
 
-      setButtons.forEach((button) => {
+      buttons.forEach((button) => {
         expect(button).toBeDisabled();
       });
-      expect(getButton).toBeDisabled();
     });
 
     it("does not make API calls when buttons are clicked while disconnected", async () => {
@@ -105,14 +109,12 @@ describe("ControlPanel", () => {
         render(<ControlPanel />);
       });
 
-      const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const getButton = screen.getByRole("button", { name: /get/i });
+      const buttons = screen.getAllByRole("button");
 
       // Try to click all buttons
-      setButtons.forEach((button) => {
+      buttons.forEach((button) => {
         fireEvent.click(button);
       });
-      fireEvent.click(getButton);
 
       // Wait to ensure no API calls are made
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -125,9 +127,10 @@ describe("ControlPanel", () => {
         render(<ControlPanel />);
       });
 
-      expect(
-        screen.getByText("⚠️ Connect to a device first")
-      ).toBeInTheDocument();
+      const warningElements = screen.getAllByText(
+        "⚠️ Connect to a device first",
+      );
+      expect(warningElements.length).toBeGreaterThan(0);
     });
   });
 
@@ -138,6 +141,11 @@ describe("ControlPanel", () => {
         setConnected: vi.fn(),
         selectedPort: "COM3",
         setSelectedPort: vi.fn(),
+      });
+
+      // Mock the initial GET request for closed loop state that happens on connect
+      mockMakeRequest.mockResolvedValue({
+        data: { success: true, closed_loop_enabled: false },
       });
     });
 
@@ -163,13 +171,11 @@ describe("ControlPanel", () => {
         render(<ControlPanel />);
       });
 
-      const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const getButton = screen.getByRole("button", { name: /get/i });
+      const buttons = screen.getAllByRole("button");
 
-      setButtons.forEach((button) => {
+      buttons.forEach((button) => {
         expect(button).toBeEnabled();
       });
-      expect(getButton).toBeEnabled();
     });
 
     it("does not show warning message when connected", async () => {
@@ -178,20 +184,24 @@ describe("ControlPanel", () => {
       });
 
       expect(
-        screen.queryByText("⚠️ Connect to a device first")
+        screen.queryByText("⚠️ Connect to a device first"),
       ).not.toBeInTheDocument();
     });
 
     it("calls set frequency endpoint when Set Frequency button is clicked", async () => {
-      mockMakeRequest.mockResolvedValueOnce({ data: { success: true } });
+      mockMakeRequest.mockResolvedValue({ data: { success: true } });
 
       await act(async () => {
         render(<ControlPanel />);
       });
 
+      // Find all Set buttons and click the first one (Frequency)
       const setButtons = screen.getAllByRole("button", { name: /set/i });
       const frequencySetButton = setButtons[0];
-      fireEvent.click(frequencySetButton);
+
+      await act(async () => {
+        fireEvent.click(frequencySetButton);
+      });
 
       await waitFor(() => {
         expect(mockMakeRequest).toHaveBeenCalledWith("/frequency", {
@@ -203,14 +213,17 @@ describe("ControlPanel", () => {
     });
 
     it("calls get frequency endpoint when Get Frequency button is clicked", async () => {
-      mockMakeRequest.mockResolvedValueOnce({ data: { frequency: 55000 } });
+      mockMakeRequest.mockResolvedValue({ data: { frequency: 55000 } });
 
       await act(async () => {
         render(<ControlPanel />);
       });
 
       const getButton = screen.getByRole("button", { name: /get/i });
-      fireEvent.click(getButton);
+
+      await act(async () => {
+        fireEvent.click(getButton);
+      });
 
       await waitFor(() => {
         expect(mockMakeRequest).toHaveBeenCalledWith("/frequency", {
@@ -221,7 +234,7 @@ describe("ControlPanel", () => {
     });
 
     it("calls set power endpoint when Set Power button is clicked", async () => {
-      mockMakeRequest.mockResolvedValueOnce({ data: { success: true } });
+      mockMakeRequest.mockResolvedValue({ data: { success: true } });
 
       await act(async () => {
         render(<ControlPanel />);
@@ -231,8 +244,11 @@ describe("ControlPanel", () => {
       fireEvent.change(powerInput, { target: { value: "75" } });
 
       const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const powerSetButton = setButtons[1];
-      fireEvent.click(powerSetButton);
+      const powerSetButton = setButtons[1]; // Second Set button is Power
+
+      await act(async () => {
+        fireEvent.click(powerSetButton);
+      });
 
       await waitFor(() => {
         expect(mockMakeRequest).toHaveBeenCalledWith("/power", {
@@ -244,14 +260,14 @@ describe("ControlPanel", () => {
     });
 
     it("calls set on time endpoint when Set On Time button is clicked", async () => {
-      mockMakeRequest.mockResolvedValueOnce({ data: { success: true } });
+      mockMakeRequest.mockResolvedValue({ data: { success: true } });
 
       await act(async () => {
         render(<ControlPanel />);
       });
 
       const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const onTimeSetButton = setButtons[2];
+      const onTimeSetButton = setButtons[2]; // Third Set button is On Time
 
       await act(async () => {
         fireEvent.click(onTimeSetButton);
@@ -270,15 +286,18 @@ describe("ControlPanel", () => {
     });
 
     it("calls set off time endpoint when Set Off Time button is clicked", async () => {
-      mockMakeRequest.mockResolvedValueOnce({ data: { success: true } });
+      mockMakeRequest.mockResolvedValue({ data: { success: true } });
 
       await act(async () => {
         render(<ControlPanel />);
       });
 
       const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const offTimeSetButton = setButtons[3];
-      fireEvent.click(offTimeSetButton);
+      const offTimeSetButton = setButtons[3]; // Fourth Set button is Off Time
+
+      await act(async () => {
+        fireEvent.click(offTimeSetButton);
+      });
 
       await waitFor(() => {
         expect(mockMakeRequest).toHaveBeenCalledWith("/off_time", {
@@ -289,11 +308,60 @@ describe("ControlPanel", () => {
       expect(screen.getByText("✅ Off time updated")).toBeInTheDocument();
     });
 
+    it("toggles transducer when Enable/Disable button is clicked", async () => {
+      mockMakeRequest.mockResolvedValue({
+        data: { success: true, enabled: false },
+      });
+
+      await act(async () => {
+        render(<ControlPanel />);
+      });
+
+      // Initially shows "Enabled"
+      expect(screen.getByText("Enabled")).toBeInTheDocument();
+
+      const transducerButton = screen.getByRole("button", { name: /disable/i });
+
+      await act(async () => {
+        fireEvent.click(transducerButton);
+      });
+
+      await waitFor(() => {
+        expect(mockMakeRequest).toHaveBeenCalledWith("/transducer", {
+          method: "POST",
+          data: { enabled: false },
+        });
+      });
+    });
+
+    it("toggles closed loop control when Enable/Disable Closed Loop button is clicked", async () => {
+      mockMakeRequest.mockResolvedValue({ data: { success: true } });
+
+      await act(async () => {
+        render(<ControlPanel />);
+      });
+
+      const closedLoopButton = screen.getByRole("button", {
+        name: /enable closed loop/i,
+      });
+
+      await act(async () => {
+        fireEvent.click(closedLoopButton);
+      });
+
+      await waitFor(() => {
+        expect(mockMakeRequest).toHaveBeenCalledWith("/closed_loop_control", {
+          method: "POST",
+          data: { enabled: true },
+        });
+      });
+    });
+
     it("displays error message when request fails", async () => {
       const consoleSpy = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
-      mockMakeRequest.mockRejectedValueOnce(new Error("Network error"));
+      mockMakeRequest.mockRejectedValue(new Error("Network error"));
 
       await act(async () => {
         render(<ControlPanel />);
@@ -301,7 +369,10 @@ describe("ControlPanel", () => {
 
       const setButtons = screen.getAllByRole("button", { name: /set/i });
       const frequencySetButton = setButtons[0];
-      fireEvent.click(frequencySetButton);
+
+      await act(async () => {
+        fireEvent.click(frequencySetButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText("❌ Request failed")).toBeInTheDocument();
@@ -309,14 +380,14 @@ describe("ControlPanel", () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         "Request failed:",
-        expect.any(Error)
+        expect.any(Error),
       );
 
       consoleSpy.mockRestore();
     });
 
     it("displays error message when backend returns success: false", async () => {
-      mockMakeRequest.mockResolvedValueOnce({
+      mockMakeRequest.mockResolvedValue({
         data: {
           success: false,
           error: "Invalid frequency",
@@ -329,7 +400,10 @@ describe("ControlPanel", () => {
 
       const setButtons = screen.getAllByRole("button", { name: /set/i });
       const frequencySetButton = setButtons[0];
-      fireEvent.click(frequencySetButton);
+
+      await act(async () => {
+        fireEvent.click(frequencySetButton);
+      });
 
       await waitFor(() => {
         expect(screen.getByText("❌ Invalid frequency")).toBeInTheDocument();
@@ -345,7 +419,10 @@ describe("ControlPanel", () => {
 
       const setButtons = screen.getAllByRole("button", { name: /set/i });
       const frequencySetButton = setButtons[0];
-      fireEvent.click(frequencySetButton);
+
+      await act(async () => {
+        fireEvent.click(frequencySetButton);
+      });
 
       await waitFor(() => {
         const allButtons = screen.getAllByRole("button");
@@ -414,12 +491,18 @@ describe("ControlPanel", () => {
       const setButtons = screen.getAllByRole("button", { name: /set/i });
       const frequencySetButton = setButtons[0];
 
-      fireEvent.click(frequencySetButton);
+      await act(async () => {
+        fireEvent.click(frequencySetButton);
+      });
+
       await waitFor(() => {
         expect(screen.getByText("✅ Frequency updated")).toBeInTheDocument();
       });
 
-      fireEvent.click(frequencySetButton);
+      await act(async () => {
+        fireEvent.click(frequencySetButton);
+      });
+
       await waitFor(() => {
         expect(screen.getByText("✅ Frequency updated")).toBeInTheDocument();
       });
@@ -437,6 +520,11 @@ describe("ControlPanel", () => {
       mockUseResonanceStatus.mockReturnValue({
         running: true,
         setRunning: vi.fn(),
+      });
+
+      // Mock the initial GET request for closed loop state
+      mockMakeRequest.mockResolvedValue({
+        data: { success: true, closed_loop_enabled: false },
       });
     });
 
@@ -462,29 +550,55 @@ describe("ControlPanel", () => {
         render(<ControlPanel />);
       });
 
-      const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const getButton = screen.getByRole("button", { name: /get/i });
+      const buttons = screen.getAllByRole("button");
 
-      setButtons.forEach((button) => {
+      buttons.forEach((button) => {
         expect(button).toBeDisabled();
       });
-      expect(getButton).toBeDisabled();
     });
 
-    it("does not make API calls when buttons are clicked while resonance is running", async () => {
+    it("allows initial state fetch when mounted even when resonance is running", async () => {
+      // Clear any previous calls
+      mockMakeRequest.mockClear();
+
       await act(async () => {
         render(<ControlPanel />);
       });
 
-      const setButtons = screen.getAllByRole("button", { name: /set/i });
-      const getButton = screen.getByRole("button", { name: /get/i });
+      // Wait a bit to ensure the effect runs
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      setButtons.forEach((button) => {
+      // The component SHOULD make the initial GET request for closed loop state
+      // because it's just reading state, not modifying anything
+      expect(mockMakeRequest).toHaveBeenCalledTimes(1);
+      expect(mockMakeRequest).toHaveBeenCalledWith("/closed_loop_control", {
+        method: "GET",
+      });
+    });
+
+    it("does not make API calls when buttons are clicked while resonance is running", async () => {
+      // Clear any previous calls
+      mockMakeRequest.mockClear();
+
+      await act(async () => {
+        render(<ControlPanel />);
+      });
+
+      // Wait a bit to ensure any initial effects run
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Reset mock to ignore the initial GET call
+      mockMakeRequest.mockClear();
+
+      const buttons = screen.getAllByRole("button");
+
+      buttons.forEach((button) => {
         fireEvent.click(button);
       });
-      fireEvent.click(getButton);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // No additional API calls should be made when clicking buttons
       expect(mockMakeRequest).not.toHaveBeenCalled();
     });
   });

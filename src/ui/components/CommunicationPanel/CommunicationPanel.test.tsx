@@ -42,21 +42,40 @@ describe("CommunicationPanel", () => {
     });
   });
 
+  const expandPanel = () => {
+    const header = screen
+      .getByText("Communication Panel")
+      .closest(".communication-header");
+    const toggle = header?.querySelector(".communication-toggle");
+    if (toggle) {
+      fireEvent.click(toggle);
+    }
+  };
+
   it("renders communication panel with default values", () => {
     render(<CommunicationPanel />);
 
-    expect(screen.getByText("Communication Setup")).toBeInTheDocument();
+    expect(screen.getByText("Communication Panel")).toBeInTheDocument();
+
+    // Expand panel to see form fields
+    expandPanel();
+
+    // Now the button should be visible
     expect(screen.getByText("Check Available Ports")).toBeInTheDocument();
+
+    // Wait for content to be visible and use more specific queries
     expect(screen.getByLabelText("Port:")).toBeInTheDocument();
+
+    // Use getByDisplayValue for inputs
     expect(screen.getByDisplayValue("9600")).toBeInTheDocument(); // baudrate
 
-    // For select elements, check that the option with value "N" is selected
-    const paritySelect = screen.getByLabelText(/Parity:/);
+    // For select elements, get by role and check value
+    const paritySelect = screen.getAllByRole("combobox")[1]; // Second combobox (first is port)
     expect(paritySelect).toHaveValue("N");
 
     expect(screen.getByDisplayValue("1")).toBeInTheDocument(); // stopbits
     expect(screen.getByDisplayValue("8")).toBeInTheDocument(); // bytesize
-    expect(screen.getByText("Connect")).toBeInTheDocument();
+    expect(screen.getByText("Connect Device")).toBeInTheDocument();
     expect(screen.getByText("🔌 Not connected")).toBeInTheDocument();
   });
 
@@ -71,6 +90,7 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
       fireEvent.click(screen.getByText("Check Available Ports"));
@@ -94,6 +114,7 @@ describe("CommunicationPanel", () => {
     mockMakeRequest.mockRejectedValueOnce(new Error("Network error"));
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
       fireEvent.click(screen.getByText("Check Available Ports"));
@@ -102,8 +123,8 @@ describe("CommunicationPanel", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "⚠️ Failed to fetch available ports. Please try again."
-        )
+          "⚠️ Failed to fetch available ports. Please try again.",
+        ),
       ).toBeInTheDocument();
     });
 
@@ -125,7 +146,7 @@ describe("CommunicationPanel", () => {
       { device: "COM3", description: "USB Serial Port" },
     ];
 
-    // Mock ports fetch
+    // Mock ports fetch (called during connect to validate port)
     mockMakeRequest.mockResolvedValueOnce({
       data: { ports: mockPorts },
     });
@@ -136,15 +157,18 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Connect"));
+      fireEvent.click(screen.getByText("Connect Device"));
     });
 
+    // First call should be to validate ports
     await waitFor(() => {
       expect(mockMakeRequest).toHaveBeenCalledWith("/ports", { method: "GET" });
     });
 
+    // Second call should be to connect
     await waitFor(() => {
       expect(mockMakeRequest).toHaveBeenCalledWith("/connect", {
         method: "POST",
@@ -175,9 +199,10 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Disconnect"));
+      fireEvent.click(screen.getByText("Disconnect Device"));
     });
 
     await waitFor(() => {
@@ -198,26 +223,31 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
-    const connectButton = screen.getByText("Connect");
+    const connectButton = screen.getByText("Connect Device");
     expect(connectButton).toBeDisabled();
   });
 
   it("disables form elements when connected", () => {
+    // Mock no error message to avoid the error status
+    const mockSetConnected = vi.fn();
     mockUseConnection.mockReturnValue({
       connected: true,
-      setConnected: vi.fn(),
+      setConnected: mockSetConnected,
       selectedPort: "COM3",
       setSelectedPort: vi.fn(),
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     expect(screen.getByLabelText("Port:")).toBeDisabled();
     expect(screen.getByDisplayValue("9600")).toBeDisabled();
 
-    // Check parity select is disabled and has correct value
-    const paritySelect = screen.getByLabelText(/Parity:/);
+    // Get selects by role instead of label text
+    const selects = screen.getAllByRole("combobox");
+    const paritySelect = selects[1]; // Second combobox is parity
     expect(paritySelect).toBeDisabled();
     expect(paritySelect).toHaveValue("N");
 
@@ -239,8 +269,9 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
-    const disconnectButton = screen.getByText("Disconnect");
+    const disconnectButton = screen.getByText("Disconnect Device");
     expect(disconnectButton).toBeDisabled();
   });
 
@@ -256,9 +287,10 @@ describe("CommunicationPanel", () => {
     mockMakeRequest.mockImplementation(() => new Promise(() => {}));
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Connect"));
+      fireEvent.click(screen.getByText("Connect Device"));
     });
 
     expect(screen.getByText("Connecting...")).toBeInTheDocument();
@@ -266,16 +298,17 @@ describe("CommunicationPanel", () => {
   });
 
   it("handles connection failure", async () => {
+    const mockSetConnected = vi.fn();
     mockUseConnection.mockReturnValue({
       connected: false,
-      setConnected: vi.fn(),
+      setConnected: mockSetConnected,
       selectedPort: "COM3",
       setSelectedPort: vi.fn(),
     });
 
     const mockPorts = [{ device: "COM3", description: "USB Serial Port" }];
 
-    // Mock ports fetch
+    // Mock ports fetch (called during connect)
     mockMakeRequest.mockResolvedValueOnce({
       data: { ports: mockPorts },
     });
@@ -286,14 +319,15 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Connect"));
+      fireEvent.click(screen.getByText("Connect Device"));
     });
 
     await waitFor(() => {
       expect(
-        screen.getByText("⚠️ Failed to connect to the selected port.")
+        screen.getByText("⚠️ Failed to connect to the selected port."),
       ).toBeInTheDocument();
     });
   });
@@ -304,9 +338,10 @@ describe("CommunicationPanel", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
 
+    const mockSetConnected = vi.fn();
     mockUseConnection.mockReturnValue({
       connected: false,
-      setConnected: vi.fn(),
+      setConnected: mockSetConnected,
       selectedPort: "COM3",
       setSelectedPort: vi.fn(),
     });
@@ -322,16 +357,17 @@ describe("CommunicationPanel", () => {
     mockMakeRequest.mockRejectedValueOnce(new Error("Connection failed"));
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Connect"));
+      fireEvent.click(screen.getByText("Connect Device"));
     });
 
     await waitFor(() => {
       expect(
         screen.getByText(
-          "⚠️ Failed to connect. Please check the device and try again."
-        )
+          "⚠️ Failed to connect. Please check the device and try again.",
+        ),
       ).toBeInTheDocument();
     });
 
@@ -360,6 +396,7 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
       fireEvent.click(screen.getByText("Check Available Ports"));
@@ -391,6 +428,7 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
       fireEvent.click(screen.getByText("Check Available Ports"));
@@ -400,7 +438,7 @@ describe("CommunicationPanel", () => {
       expect(mockSetConnected).toHaveBeenCalledWith(false);
       expect(mockSetSelectedPort).toHaveBeenCalledWith("");
       expect(
-        screen.getByText("⚠️ Connection lost: port is no longer available.")
+        screen.getByText("⚠️ Connection lost: port is no longer available."),
       ).toBeInTheDocument();
     });
   });
@@ -419,12 +457,23 @@ describe("CommunicationPanel", () => {
   });
 
   it("allows changing communication parameters when not connected", () => {
+    mockUseConnection.mockReturnValue({
+      connected: false,
+      setConnected: vi.fn(),
+      selectedPort: "",
+      setSelectedPort: vi.fn(),
+    });
+
     render(<CommunicationPanel />);
+    expandPanel();
 
     const baudrateInput = screen.getByDisplayValue("9600");
-    const paritySelect = screen.getByLabelText(/Parity:/);
     const stopbitsInput = screen.getByDisplayValue("1");
     const bytesizeInput = screen.getByDisplayValue("8");
+
+    // Get selects by role instead of label text
+    const selects = screen.getAllByRole("combobox");
+    const paritySelect = selects[1]; // Second combobox is parity
 
     expect(baudrateInput).not.toBeDisabled();
     expect(paritySelect).not.toBeDisabled();
@@ -449,6 +498,7 @@ describe("CommunicationPanel", () => {
     });
 
     render(<CommunicationPanel />);
+    expandPanel();
 
     await act(async () => {
       fireEvent.click(screen.getByText("Check Available Ports"));
@@ -461,5 +511,30 @@ describe("CommunicationPanel", () => {
       const portOptions = portSelect.querySelectorAll("option");
       expect(portOptions).toHaveLength(1); // Only "Select a Port" option
     });
+  });
+
+  it("toggles collapsible section", () => {
+    render(<CommunicationPanel />);
+
+    // Initially, form content should not be visible (collapsed)
+    expect(screen.queryByText("Connect Device")).not.toBeInTheDocument();
+
+    // Expand panel
+    expandPanel();
+
+    // Now content should be visible
+    expect(screen.getByText("Connect Device")).toBeInTheDocument();
+
+    // Collapse again
+    const header = screen
+      .getByText("Communication Panel")
+      .closest(".communication-header");
+    const toggle = header?.querySelector(".communication-toggle");
+    if (toggle) {
+      fireEvent.click(toggle);
+    }
+
+    // Content should be hidden again
+    expect(screen.queryByText("Connect Device")).not.toBeInTheDocument();
   });
 });

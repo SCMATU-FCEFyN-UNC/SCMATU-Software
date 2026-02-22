@@ -24,6 +24,10 @@ describe("ResonanceModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockMakeRequest.mockReset();
+    // Provide a safe default response for initial /resonance/status calls
+    mockMakeRequest.mockResolvedValue({
+      data: { status_code: 0, status_text: "" },
+    });
     (useBackendRequest as Mock).mockReturnValue({
       makeRequest: mockMakeRequest,
       loading: false,
@@ -63,11 +67,17 @@ describe("ResonanceModal", () => {
       setStatusText: mockSetStatusText,
     });
 
+    // The component checks existing status on mount; return a harmless status first
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { status_code: 0, status_text: "" },
+    });
+
+    // Then prepare the 4 responses used by the firmware start flow
     mockMakeRequest
-      .mockResolvedValueOnce({ data: { success: true } }) // start
-      .mockResolvedValueOnce({ data: { success: true } }) // end
-      .mockResolvedValueOnce({ data: { success: true } }) // step
-      .mockResolvedValueOnce({ data: { success: true } }); // start measurement
+      .mockResolvedValueOnce({ data: { success: true } }) // /resonance/frequency/start
+      .mockResolvedValueOnce({ data: { success: true } }) // /resonance/frequency/end
+      .mockResolvedValueOnce({ data: { success: true } }) // /resonance/frequency/step
+      .mockResolvedValueOnce({ data: { success: true } }); // /resonance/start
 
     await act(async () => {
       render(<ResonanceModal onClose={mockOnClose} />);
@@ -80,9 +90,25 @@ describe("ResonanceModal", () => {
 
     expect(mockSetRunning).toHaveBeenCalledWith(true);
     expect(mockSetStatusText).toHaveBeenCalledWith(
-      "Measurement in progress..."
+      "Measurement in progress...",
     );
-    expect(mockMakeRequest).toHaveBeenCalledTimes(4);
+
+    // Verify the sequence included the firmware register writes and start call
+    expect(mockMakeRequest).toHaveBeenCalledWith("/resonance/frequency/start", {
+      method: "POST",
+      data: { frequency_range_start: 20000 },
+    });
+    expect(mockMakeRequest).toHaveBeenCalledWith("/resonance/frequency/end", {
+      method: "POST",
+      data: { frequency_range_end: 140000 },
+    });
+    expect(mockMakeRequest).toHaveBeenCalledWith("/resonance/frequency/step", {
+      method: "POST",
+      data: { frequency_step: 10 },
+    });
+    expect(mockMakeRequest).toHaveBeenCalledWith("/resonance/start", {
+      method: "POST",
+    });
   });
 
   it("disables inputs and buttons while measurement is running", async () => {
@@ -122,7 +148,7 @@ describe("ResonanceModal", () => {
     });
 
     expect(
-      screen.getByText(/this process may take several minutes/i)
+      screen.getByText(/this process may take several minutes/i),
     ).toBeInTheDocument();
     expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
   });
@@ -141,6 +167,10 @@ describe("ResonanceModal", () => {
       setStatusText: mockSetStatusText,
     });
 
+    // First respond to initial status check, then make the start call fail
+    mockMakeRequest.mockResolvedValueOnce({
+      data: { status_code: 0, status_text: "" },
+    });
     mockMakeRequest.mockRejectedValueOnce(new Error("Test error"));
 
     await act(async () => {
@@ -155,7 +185,7 @@ describe("ResonanceModal", () => {
 
     await waitFor(() => {
       expect(mockSetStatusText).toHaveBeenCalledWith(
-        "Error starting measurement"
+        "Error starting measurement",
       );
       expect(mockSetRunning).toHaveBeenCalledWith(false);
       expect(console.error).toHaveBeenCalledWith("Error:", expect.any(Error));

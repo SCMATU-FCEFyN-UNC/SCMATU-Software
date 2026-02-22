@@ -29,8 +29,8 @@ vi.mock("../SerialNumberModal/SerialNumberModal", () => {
               onClose?.();
             },
           },
-          "Confirm"
-        )
+          "Confirm",
+        ),
       ),
   };
 });
@@ -60,6 +60,17 @@ beforeEach(() => {
   });
 });
 
+// Helper function to expand the collapsed panel
+const expandPanel = () => {
+  const header = screen
+    .getByText("Device Data Panel")
+    .closest(".device-data-header");
+  const toggle = header?.querySelector(".device-data-toggle");
+  if (toggle) {
+    fireEvent.click(toggle);
+  }
+};
+
 describe("DeviceDataPanel", () => {
   it("renders fields and buttons disabled when disconnected", async () => {
     await act(async () => {
@@ -68,15 +79,20 @@ describe("DeviceDataPanel", () => {
 
     expect(screen.getByText("Device Data Panel")).toBeInTheDocument();
 
+    // Expand panel to see the content
+    expandPanel();
+
     // Serial controls
-    expect(screen.getByRole("button", { name: /read/i })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: /update serial number/i })
+      screen.getByRole("button", { name: /read serial number/i }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /update serial number/i }),
     ).toBeDisabled();
 
     // Refresh SN status
     expect(
-      screen.getByRole("button", { name: /refresh status/i })
+      screen.getByRole("button", { name: /refresh status/i }),
     ).toBeDisabled();
 
     // Sample group Set/Get: first 'Set' button should be disabled
@@ -84,7 +100,9 @@ describe("DeviceDataPanel", () => {
     setButtons.forEach((btn) => expect(btn).toBeDisabled());
 
     // Ensure no backend calls are made when disconnected
-    fireEvent.click(screen.getByRole("button", { name: /read/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /read serial number/i }),
+    );
     await new Promise((r) => setTimeout(r, 50));
     expect(mockMakeRequest).not.toHaveBeenCalled();
   });
@@ -124,14 +142,18 @@ describe("DeviceDataPanel", () => {
       expect(mockMakeRequest).toHaveBeenCalled();
     });
 
+    // Expand panel to see the content
+    expandPanel();
+
     // Verify the loaded message appears
     await waitFor(() => {
       expect(screen.getByText("✅ Device data loaded")).toBeInTheDocument();
     });
 
-    // Inputs should be enabled
-    const samplesInput = screen.getByDisplayValue("100");
-    expect(samplesInput).toBeEnabled();
+    // Inputs should be enabled - use getAllByDisplayValue since there might be multiple inputs with same value
+    const samplesInputs = screen.getAllByDisplayValue("100");
+    expect(samplesInputs.length).toBeGreaterThan(0);
+    expect(samplesInputs[0]).toBeEnabled();
 
     // 'Set' buttons should be enabled
     const setButtons = screen.getAllByRole("button", { name: /set/i });
@@ -146,21 +168,42 @@ describe("DeviceDataPanel", () => {
       setSelectedPort: vi.fn(),
     });
 
-    // First, make GETs resolve to avoid interfering with the test
-    mockMakeRequest.mockResolvedValue({ data: { success: true } });
+    // First, make GETs resolve with some initial data
+    mockMakeRequest.mockResolvedValue({
+      data: {
+        success: true,
+        samples: 100,
+        adc_samples: 10,
+        shunt_res: 5,
+        voltage_gain: 2,
+        current_gain: 3,
+        max_distance: 1,
+        sweep_width: 20,
+        control_period: 30,
+      },
+    });
 
     await act(async () => {
       render(<DeviceDataPanel />);
     });
 
-    // Change samples input value
-    const samplesInput = screen.queryByLabelText(
-      /Samples Amount/i
-    ) as HTMLInputElement | null;
-    // If label lookup fails (label may not be linked), fall back to first number input (spinbutton)
-    const inputToUse = (samplesInput ??
-      screen.getAllByRole("spinbutton")[0]) as HTMLInputElement;
-    fireEvent.change(inputToUse, { target: { value: "150" } });
+    // Expand panel to see the content
+    expandPanel();
+
+    // Wait for initial data to load
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("100")).toBeInTheDocument();
+    });
+
+    // Find the samples input by looking for input with value 100 (from mock data)
+    // Since there might be multiple inputs with value 100, we need to identify the correct one
+    const inputs = screen.getAllByDisplayValue("100");
+
+    // The samples input is likely the first one in the device-data-fields section
+    const samplesInput = inputs[0] as HTMLInputElement;
+
+    // Change the value
+    fireEvent.change(samplesInput, { target: { value: "150" } });
 
     // Ensure next POST resolves
     mockMakeRequest.mockResolvedValueOnce({ data: { success: true } });
@@ -178,7 +221,7 @@ describe("DeviceDataPanel", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/✅ Samples amount updated/i)
+        screen.getByText(/✅ Samples amount updated/i),
       ).toBeInTheDocument();
     });
   });
@@ -198,6 +241,9 @@ describe("DeviceDataPanel", () => {
     await act(async () => {
       render(<DeviceDataPanel />);
     });
+
+    // Expand panel to see the content
+    expandPanel();
 
     const updateButton = screen.getByRole("button", {
       name: /update serial number/i,
@@ -224,6 +270,9 @@ describe("DeviceDataPanel", () => {
       render(<DeviceDataPanel />);
     });
 
+    // Expand panel to see the content
+    expandPanel();
+
     const refreshBtn = screen.getByRole("button", { name: /refresh status/i });
     fireEvent.click(refreshBtn);
 
@@ -245,9 +294,16 @@ describe("DeviceDataPanel", () => {
     // Make GETs succeed initially
     mockMakeRequest.mockResolvedValue({ data: { success: true } });
 
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
     await act(async () => {
       render(<DeviceDataPanel />);
     });
+
+    // Expand panel to see the content
+    expandPanel();
 
     // Now make the POST fail
     mockMakeRequest.mockRejectedValueOnce(new Error("Network error"));
@@ -259,5 +315,7 @@ describe("DeviceDataPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("❌ Request failed")).toBeInTheDocument();
     });
+
+    consoleErrorSpy.mockRestore();
   });
 });
