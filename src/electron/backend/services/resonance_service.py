@@ -1,5 +1,6 @@
 from backend.services.connection_manager import manager
 from backend.services import monitoring_service
+from backend.services.device_data_service import DeviceDataService 
 import threading
 import time
 import os
@@ -130,7 +131,18 @@ def _ns_to_deg(phase_ns: Optional[float], frequency_hz: Optional[float]) -> Opti
 
 
 def _compute_picks(results: List[Dict[str, Any]]) -> Dict[str, Optional[Dict[str, Any]]]:
-    """Determine best overall / phase / current points."""
+    """Determine best overall / phase / current points.
+    
+    Logic:
+    1. Find best_phase (min phase_ns among all valid)
+    2. Find best_current (max current_a among all valid)
+    3. Filter to frequencies within +/- max_dist Hz from best_phase
+    4. Among filtered, find max current
+    5. Among those with max current, find min phase -> this is best_overall
+    """
+    max_dist = DeviceDataService.get_phase_curr_max_distance()
+    print(f"Computing picks with max distance: {max_dist} Hz", flush=True)
+    
     if not results:
         return {"best_overall": None, "best_phase": None, "best_current": None}
 
@@ -138,15 +150,29 @@ def _compute_picks(results: List[Dict[str, Any]]) -> Dict[str, Optional[Dict[str
     if not valid:
         return {"best_overall": None, "best_phase": None, "best_current": None}
 
+    # Step 1: Find best phase (min phase_ns among all valid)
     best_phase = min(valid, key=lambda r: abs(r["phase_ns"]))
+    
+    # Step 2: Find best current (max current_a among all valid)
     best_current = max(valid, key=lambda r: r["current_a"])
 
-    max_current = best_current["current_a"]
-    candidates = [r for r in valid if r["current_a"] == max_current]
-    combined = min(candidates, key=lambda r: abs(r["phase_ns"]))
+    # Step 3: Filter to frequencies within +/- max_dist Hz from best_phase frequency
+    best_phase_freq = best_phase["frequency"]
+    freq_filtered = [r for r in valid if abs(r["frequency"] - best_phase_freq) <= max_dist]
+    
+    # If no results within the distance, fall back to all valid results
+    if not freq_filtered:
+        freq_filtered = valid
+    
+    # Step 4 & 5: Find max current in filtered group, then filter to those with max current
+    max_current_filtered = max(freq_filtered, key=lambda r: r["current_a"])["current_a"]
+    candidates = [r for r in freq_filtered if r["current_a"] == max_current_filtered]
+    
+    # Step 6: Choose the one with min phase among candidates
+    best_overall = min(candidates, key=lambda r: abs(r["phase_ns"]))
 
     return {
-        "best_overall": combined,
+        "best_overall": best_overall,
         "best_phase": best_phase,
         "best_current": best_current,
     }
