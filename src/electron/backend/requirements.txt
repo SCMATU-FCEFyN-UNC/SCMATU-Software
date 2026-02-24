@@ -1,0 +1,9 @@
+# Backend Python dependencies (auto-generated)
+# Place this file in the backend folder. You may copy it to the repo root if you prefer a project-level requirements.txt
+Flask
+Flask-Cors
+waitress
+pymodbus
+pyserial
+matplotlib
+pytest

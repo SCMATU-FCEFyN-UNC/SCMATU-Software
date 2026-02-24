@@ -33,12 +33,16 @@
             "nsis"
         ]
     },
+    "portable": {
+        "artifactName": "ultrasonic-amplifier-control-${version}-${arch}.portable.${ext}"
+    },
     "nsis": {
         "oneClick": false,
         "allowToChangeInstallationDirectory": true,
         "createDesktopShortcut": true,
-        "shortcutName": "SCMATU-Software",
+        "shortcutName": "Ultrasonic Amplifier Control",
         "allowElevation": true,
-        "runAfterFinish": true
+        "runAfterFinish": true,
+        "artifactName": "ultrasonic-amplifier-control-${version}-${arch}.installer.${ext}"
     }
 }
