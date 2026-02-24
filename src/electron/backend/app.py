@@ -9,7 +9,7 @@ from backend.routes import register_routes
 def create_app():
     """Factory function to create and configure the Flask app."""
     app = Flask(__name__)
-    CORS(app, origins=["http://localhost:5123"])  # Allow UI to call backend
+    CORS(app, origins=["http://localhost:5123", "null", "file://", "app://-"]) 
     register_routes(app)  # Attach all route blueprints
     return app
 
@@ -26,5 +26,3 @@ if __name__ == "__main__":
     print(f"Starting server on http://127.0.0.1:{port}", flush=True)
 
     serve(app, host="127.0.0.1", port=port)
-
-    

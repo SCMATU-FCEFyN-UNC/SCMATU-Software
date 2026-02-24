@@ -251,7 +251,7 @@ const DeviceDataPanel: React.FC = () => {
     await handleRequest(
       "/samples",
       { samples: samplesAmount },
-      "Samples amount updated"
+      "Samples amount updated",
     );
   };
 
@@ -259,7 +259,7 @@ const DeviceDataPanel: React.FC = () => {
     await handleRequest(
       "/adc_samples",
       { adc_samples: adcSamplesAmount },
-      "ADC samples amount updated"
+      "ADC samples amount updated",
     );
   };
 
@@ -267,7 +267,7 @@ const DeviceDataPanel: React.FC = () => {
     await handleRequest(
       "/shunt_res",
       { shunt_res: shuntRes },
-      "Shunt resistor value updated"
+      "Shunt resistor value updated",
     );
   };
 
@@ -275,7 +275,7 @@ const DeviceDataPanel: React.FC = () => {
     await handleRequest(
       "/voltage_gain",
       { gain: voltageGain },
-      "Voltage adecuator gain updated"
+      "Voltage adecuator gain updated",
     );
   };
 
@@ -283,7 +283,7 @@ const DeviceDataPanel: React.FC = () => {
     await handleRequest(
       "/current_gain",
       { gain: currentGain },
-      "Current adecuator gain updated"
+      "Current adecuator gain updated",
     );
   };
 
@@ -291,7 +291,7 @@ const DeviceDataPanel: React.FC = () => {
     await handleRequest(
       "/phase_curr_max_distance",
       { distance: phaseCurrMaxDistance },
-      "Phase current max distance updated"
+      "Phase current max distance updated",
     );
   };
 
@@ -299,7 +299,7 @@ const DeviceDataPanel: React.FC = () => {
     await handleRequest(
       "/auto_freq_sweep_width",
       { width: autoFreqSweepWidth },
-      "Auto frequency sweep width updated"
+      "Auto frequency sweep width updated",
     );
   };
 
@@ -307,14 +307,14 @@ const DeviceDataPanel: React.FC = () => {
     await handleRequest(
       "/closed_loop_control_period",
       { period: closedLoopControlPeriod },
-      "Closed loop control period updated"
+      "Closed loop control period updated",
     );
   };
 
   const handleRequest = async (
     endpoint: string,
     data: object,
-    successMsg: string
+    successMsg: string,
   ) => {
     try {
       setLoading(true);
@@ -367,14 +367,14 @@ const DeviceDataPanel: React.FC = () => {
                   {snWriteStatus === 0
                     ? "Idle"
                     : snWriteStatus === 1
-                    ? "Write Success"
-                    : snWriteStatus === 2
-                    ? "Incorrect Password"
-                    : snWriteStatus === 3
-                    ? "Write Not Authorized"
-                    : snWriteStatus === 4
-                    ? "Write Not Available"
-                    : "Unknown Status"}
+                      ? "Write Success"
+                      : snWriteStatus === 2
+                        ? "Incorrect Password"
+                        : snWriteStatus === 3
+                          ? "Write Not Authorized"
+                          : snWriteStatus === 4
+                            ? "Write Not Available"
+                            : "Unknown Status"}
                 </p>
               </div>
               <button

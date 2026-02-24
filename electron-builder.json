@@ -1,5 +1,5 @@
 {
-    "appId": "com.lh_unc_pardina_lucas.scmatu_software", 
+    "appId": "com.lh_unc_pardina_lucas.ultrasonic-amplifier-control", 
     "files": [
         "dist-electron",
         "dist-react"
@@ -8,7 +8,7 @@
         {
             "from": "src/electron/backend",
             "to": "backend",
-            "filter": ["**/*"]
+            "filter": ["*.exe"]
         },
         {
             "from": "dist-electron",

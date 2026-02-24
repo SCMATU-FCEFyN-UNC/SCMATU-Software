@@ -4,6 +4,7 @@ from .monitoring_routes import monitoring_bp
 from .resonance_routes import resonance_bp
 from .device_routes import device_bp
 from .folders_routes import folders_bp
+from .shutdown_routes import shutdown_bp
 
 def register_routes(app):
     app.register_blueprint(serial_bp)
@@ -12,3 +13,4 @@ def register_routes(app):
     app.register_blueprint(resonance_bp)
     app.register_blueprint(device_bp)
     app.register_blueprint(folders_bp)
+    app.register_blueprint(shutdown_bp)

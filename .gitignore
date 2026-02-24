@@ -9,6 +9,7 @@ lerna-debug.log*
 
 # node
 node_modules
+build
 dist
 dist-react
 dist-electron
@@ -29,4 +30,5 @@ dist-ssr
 # Python auto-generated files
 __pycache__/
 .pytest_cache/
-
+app.spec
+app.exe
