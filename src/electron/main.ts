@@ -118,7 +118,7 @@ function startBackend(port: number) {
     // Dev: run python module
     backendProcess = spawn(pythonExecutable, ["-m", "backend.app", port.toString()], {
       cwd: cwdPath,
-      windowsHide: true,
+      //windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
     });
   } else {
@@ -127,7 +127,7 @@ function startBackend(port: number) {
     const exePath = path.join(process.resourcesPath, "backend", exeName);
     backendProcess = spawn(exePath, [port.toString()], {
       cwd: path.dirname(exePath),
-      windowsHide: true,
+      //windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
     });
   }
