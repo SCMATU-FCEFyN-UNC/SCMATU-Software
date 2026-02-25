@@ -34,7 +34,7 @@
         ]
     },
     "portable": {
-        "artifactName": "ultrasonic-amplifier-control-${version}-${arch}.portable.${ext}"
+        "artifactName": "ultrasonic-amplifier-control-win-${arch}.portable.${ext}"
     },
     "nsis": {
         "oneClick": false,
@@ -43,6 +43,6 @@
         "shortcutName": "Ultrasonic Amplifier Control",
         "allowElevation": true,
         "runAfterFinish": true,
-        "artifactName": "ultrasonic-amplifier-control-${version}-${arch}.installer.${ext}"
+        "artifactName": "ultrasonic-amplifier-control-win-${arch}.installer.${ext}"
     }
 }

@@ -5,7 +5,7 @@ Control and visualization app for the thesis project "SCMATU," which aims to eva
 
 You can download the latest stable version here:
 
-- Download for Windows 10 & above: ![Setup_v1.0.0_64_bits](https://github.com/SCMATU-FCEFyN-UNC/SCMATU-Software/releases/latest/download/ultrasonic-amplifier-control-1.0.0-x64.installer.exe)
+- Download for Windows 10 & above (64 bits): ![Latest Installer](https://github.com/SCMATU-FCEFyN-UNC/SCMATU-Software/releases/latest/download/ultrasonic-amplifier-control-win-x64.installer.exe)
 
 ## 🛠 Development Environment Setup
 
